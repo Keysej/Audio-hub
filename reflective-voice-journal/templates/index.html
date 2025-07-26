@@ -13,30 +13,34 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #8B4513 0%, #A0522D 50%, #CD853F 100%);
             min-height: 100vh;
             padding: 20px;
+            color: white;
         }
 
         .container {
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
-            background: white;
+            background: rgba(139, 69, 19, 0.9);
             border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
             overflow: hidden;
+            border: 2px solid #D2691E;
         }
 
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%);
             color: white;
             padding: 40px 30px;
             text-align: center;
+            border-bottom: 3px solid #D2691E;
         }
 
         .header h1 {
             font-size: 2.5rem;
             margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
         }
 
         .header p {
@@ -52,58 +56,88 @@
             margin-bottom: 40px;
             padding: 30px;
             border-radius: 15px;
-            background: #f8f9fa;
-            border: 1px solid #e9ecef;
+            background: rgba(160, 82, 45, 0.8);
+            border: 2px solid #D2691E;
+            color: white;
         }
 
         .section h2 {
-            color: #333;
+            color: white;
             margin-bottom: 20px;
             font-size: 1.5rem;
             display: flex;
             align-items: center;
             gap: 10px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
         }
 
-        .upload-area {
-            border: 2px dashed #667eea;
-            border-radius: 10px;
-            padding: 40px;
-            text-align: center;
-            background: white;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-
-        .upload-area:hover {
-            border-color: #764ba2;
-            background: #f8f9ff;
-        }
-
-        .upload-area.dragover {
-            border-color: #764ba2;
-            background: #f0f2ff;
-        }
-
-        .file-input {
-            display: none;
+        .recording-controls {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
         .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #D2691E 0%, #CD853F 100%);
             color: white;
             border: none;
-            padding: 12px 30px;
+            padding: 12px 25px;
             border-radius: 25px;
             cursor: pointer;
             font-size: 1rem;
             transition: all 0.3s ease;
-            margin: 10px;
+            margin: 5px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
 
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+            background: linear-gradient(135deg, #CD853F 0%, #D2691E 100%);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn.recording {
+            background: linear-gradient(135deg, #DC143C 0%, #B22222 100%);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .upload-area {
+            border: 2px dashed #D2691E;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            background: rgba(255,255,255,0.1);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            color: white;
+        }
+
+        .upload-area:hover {
+            border-color: #CD853F;
+            background: rgba(255,255,255,0.15);
+        }
+
+        .upload-area.dragover {
+            border-color: #CD853F;
+            background: rgba(255,255,255,0.2);
+        }
+
+        .file-input {
+            display: none;
         }
 
         .recordings-list {
@@ -111,14 +145,19 @@
         }
 
         .recording-item {
-            background: white;
-            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
             border-radius: 10px;
-            margin-bottom: 10px;
-            border: 1px solid #e9ecef;
+            margin-bottom: 15px;
+            border: 1px solid #D2691E;
+            color: white;
+        }
+
+        .recording-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 15px;
         }
 
         .recording-info {
@@ -127,42 +166,89 @@
 
         .recording-name {
             font-weight: bold;
-            color: #333;
+            color: white;
+            font-size: 1.1rem;
         }
 
         .recording-meta {
             font-size: 0.9rem;
-            color: #666;
+            color: #F5DEB3;
             margin-top: 5px;
+        }
+
+        .recording-type {
+            background: #D2691E;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            margin-left: 10px;
+        }
+
+        .recording-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .playback-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .speed-control select {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid #D2691E;
+            border-radius: 5px;
+            padding: 5px;
+        }
+
+        .speed-control select option {
+            background: #8B4513;
+            color: white;
         }
 
         .status {
             padding: 10px;
             border-radius: 5px;
             margin: 10px 0;
+            color: white;
         }
 
         .status.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+            background: rgba(34, 139, 34, 0.8);
+            border: 1px solid #228B22;
         }
 
         .status.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+            background: rgba(220, 20, 60, 0.8);
+            border: 1px solid #DC143C;
+        }
+
+        .status.info {
+            background: rgba(30, 144, 255, 0.8);
+            border: 1px solid #1E90FF;
         }
 
         .loading {
             display: none;
             text-align: center;
             padding: 20px;
+            color: white;
         }
 
         .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top: 3px solid #D2691E;
             border-radius: 50%;
             width: 30px;
             height: 30px;
@@ -174,6 +260,23 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .audio-player {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .recording-visualizer {
+            width: 100%;
+            height: 60px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #F5DEB3;
+        }
     </style>
 </head>
 <body>
@@ -184,6 +287,22 @@
         </div>
 
         <div class="content">
+            <!-- Recording Section -->
+            <div class="section">
+                <h2>🎤 Record Your Voice</h2>
+                <div class="recording-controls">
+                    <button class="btn" id="startRecord">Start Recording</button>
+                    <button class="btn" id="stopRecord" disabled>Stop Recording</button>
+                    <button class="btn" id="resetRecord" disabled>Reset</button>
+                    <button class="btn" id="saveRecord" disabled>Save Recording</button>
+                </div>
+                <div class="recording-visualizer" id="visualizer">
+                    Click "Start Recording" to begin
+                </div>
+                <div id="recordingStatus"></div>
+            </div>
+
+            <!-- Upload Section -->
             <div class="section">
                 <h2>📁 Upload Audio File</h2>
                 <div class="upload-area" id="uploadArea">
@@ -193,15 +312,16 @@
                         <button class="btn" onclick="document.getElementById('fileInput').click()">
                             Choose File
                         </button>
-                        <p style="margin-top: 10px; font-size: 0.9rem; color: #666;">
+                        <p style="margin-top: 10px; font-size: 0.9rem; color: #F5DEB3;">
                             Supported formats: .wav, .mp3
                         </p>
                     </div>
                     <input type="file" id="fileInput" class="file-input" accept=".wav,.mp3">
                 </div>
-                <div id="status"></div>
+                <div id="uploadStatus"></div>
             </div>
 
+            <!-- Recordings List -->
             <div class="section">
                 <h2>📋 Your Recordings</h2>
                 <button class="btn" onclick="loadRecordings()">Refresh List</button>
@@ -215,11 +335,128 @@
     </div>
 
     <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        // Recording functionality
+        document.getElementById('startRecord').addEventListener('click', startRecording);
+        document.getElementById('stopRecord').addEventListener('click', stopRecording);
+        document.getElementById('resetRecord').addEventListener('click', resetRecording);
+        document.getElementById('saveRecord').addEventListener('click', saveRecording);
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    // Create audio element for preview
+                    const audio = document.createElement('audio');
+                    audio.src = audioUrl;
+                    audio.controls = true;
+                    audio.className = 'audio-player';
+                    
+                    document.getElementById('visualizer').innerHTML = '';
+                    document.getElementById('visualizer').appendChild(audio);
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                
+                document.getElementById('startRecord').disabled = true;
+                document.getElementById('stopRecord').disabled = false;
+                document.getElementById('resetRecord').disabled = false;
+                document.getElementById('saveRecord').disabled = true;
+                
+                document.getElementById('visualizer').textContent = 'Recording...';
+                document.getElementById('visualizer').style.background = 'rgba(220, 20, 60, 0.3)';
+                
+                showStatus('Recording started...', 'info', 'recordingStatus');
+            } catch (error) {
+                showStatus('Error starting recording: ' + error.message, 'error', 'recordingStatus');
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                document.getElementById('startRecord').disabled = false;
+                document.getElementById('stopRecord').disabled = true;
+                document.getElementById('saveRecord').disabled = false;
+                
+                document.getElementById('visualizer').style.background = 'rgba(34, 139, 34, 0.3)';
+                showStatus('Recording stopped. Click "Save Recording" to save.', 'success', 'recordingStatus');
+            }
+        }
+
+        function resetRecording() {
+            audioChunks = [];
+            isRecording = false;
+            
+            document.getElementById('startRecord').disabled = false;
+            document.getElementById('stopRecord').disabled = true;
+            document.getElementById('resetRecord').disabled = true;
+            document.getElementById('saveRecord').disabled = true;
+            
+            document.getElementById('visualizer').innerHTML = 'Click "Start Recording" to begin';
+            document.getElementById('visualizer').style.background = 'rgba(255,255,255,0.1)';
+            
+            showStatus('Recording reset', 'info', 'recordingStatus');
+        }
+
+        async function saveRecording() {
+            if (audioChunks.length === 0) {
+                showStatus('No recording to save', 'error', 'recordingStatus');
+                return;
+            }
+
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            const reader = new FileReader();
+            
+            reader.onload = async function() {
+                try {
+                    const response = await fetch('/save-recording', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            audio_data: reader.result
+                        })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showStatus(data.message, 'success', 'recordingStatus');
+                        loadRecordings();
+                        resetRecording();
+                    } else {
+                        showStatus(data.error, 'error', 'recordingStatus');
+                    }
+                } catch (error) {
+                    showStatus('Error saving recording: ' + error.message, 'error', 'recordingStatus');
+                }
+            };
+            
+            reader.readAsDataURL(audioBlob);
+        }
+
+        // Upload functionality
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
-        const status = document.getElementById('status');
 
-        // Drag and drop functionality
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
@@ -248,7 +485,7 @@
             const formData = new FormData();
             formData.append('file', file);
 
-            showStatus('Uploading file...', 'info');
+            showStatus('Uploading file...', 'info', 'uploadStatus');
 
             fetch('/upload', {
                 method: 'POST',
@@ -257,21 +494,22 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    showStatus(data.message, 'success');
+                    showStatus(data.message, 'success', 'uploadStatus');
                     loadRecordings();
                 } else {
-                    showStatus(data.error, 'error');
+                    showStatus(data.error, 'error', 'uploadStatus');
                 }
             })
             .catch(error => {
-                showStatus('Upload failed: ' + error.message, 'error');
+                showStatus('Upload failed: ' + error.message, 'error', 'uploadStatus');
             });
         }
 
-        function showStatus(message, type) {
-            status.innerHTML = `<div class="status ${type}">${message}</div>`;
+        function showStatus(message, type, elementId) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="status ${type}">${message}</div>`;
             setTimeout(() => {
-                status.innerHTML = '';
+                element.innerHTML = '';
             }, 5000);
         }
 
@@ -288,19 +526,43 @@
                 loading.style.display = 'none';
                 
                 if (recordings.length === 0) {
-                    recordingsList.innerHTML = '<p style="text-align: center; color: #666;">No recordings found</p>';
+                    recordingsList.innerHTML = '<p style="text-align: center; color: #F5DEB3;">No recordings found</p>';
                     return;
                 }
 
                 recordings.forEach(recording => {
                     const item = document.createElement('div');
                     item.className = 'recording-item';
+                    
+                    const typeLabel = recording.type === 'recorded' ? '🎤 Recorded' : '📁 Uploaded';
+                    
                     item.innerHTML = `
-                        <div class="recording-info">
-                            <div class="recording-name">${recording.filename}</div>
-                            <div class="recording-meta">
-                                Size: ${formatFileSize(recording.size)} | Created: ${recording.created}
+                        <div class="recording-header">
+                            <div class="recording-info">
+                                <div class="recording-name">${recording.filename}</div>
+                                <div class="recording-meta">
+                                    Size: ${formatFileSize(recording.size)} | Created: ${recording.created}
+                                </div>
                             </div>
+                            <span class="recording-type">${typeLabel}</span>
+                        </div>
+                        <div class="playback-controls">
+                            <audio class="audio-player" controls>
+                                <source src="/download/${recording.filename}" type="audio/wav">
+                                Your browser does not support the audio element.
+                            </audio>
+                            <div class="speed-control">
+                                <label>Speed:</label>
+                                <select onchange="changePlaybackSpeed(this, '${recording.filename}')">
+                                    <option value="0.5">0.5x</option>
+                                    <option value="0.75">0.75x</option>
+                                    <option value="1" selected>1x</option>
+                                    <option value="1.25">1.25x</option>
+                                    <option value="1.5">1.5x</option>
+                                    <option value="2">2x</option>
+                                </select>
+                            </div>
+                            <button class="btn" onclick="downloadFile('${recording.filename}')">Download</button>
                         </div>
                     `;
                     recordingsList.appendChild(item);
@@ -308,8 +570,17 @@
             })
             .catch(error => {
                 loading.style.display = 'none';
-                recordingsList.innerHTML = '<p style="text-align: center; color: #f44336;">Error loading recordings</p>';
+                recordingsList.innerHTML = '<p style="text-align: center; color: #DC143C;">Error loading recordings</p>';
             });
+        }
+
+        function changePlaybackSpeed(select, filename) {
+            const audio = select.closest('.playback-controls').querySelector('audio');
+            audio.playbackRate = parseFloat(select.value);
+        }
+
+        function downloadFile(filename) {
+            window.open(`/download/${filename}`, '_blank');
         }
 
         function formatFileSize(bytes) {
