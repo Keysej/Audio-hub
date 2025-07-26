@@ -109,6 +109,14 @@
             animation: pulse 1.5s infinite;
         }
 
+        .btn.danger {
+            background: linear-gradient(135deg, #DC143C 0%, #B22222 100%);
+        }
+
+        .btn.danger:hover {
+            background: linear-gradient(135deg, #B22222 0%, #DC143C 100%);
+        }
+
         @keyframes pulse {
             0% { transform: scale(1); }
             50% { transform: scale(1.05); }
@@ -146,55 +154,68 @@
 
         .recording-item {
             background: rgba(255,255,255,0.1);
-            padding: 20px;
+            padding: 15px;
             border-radius: 10px;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             border: 1px solid #D2691E;
             color: white;
+            transition: all 0.3s ease;
+        }
+
+        .recording-item:hover {
+            background: rgba(255,255,255,0.15);
+            transform: translateY(-2px);
         }
 
         .recording-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
 
         .recording-info {
             flex: 1;
+            min-width: 0;
         }
 
         .recording-name {
             font-weight: bold;
             color: white;
-            font-size: 1.1rem;
+            font-size: 0.95rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 300px;
         }
 
         .recording-meta {
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             color: #F5DEB3;
-            margin-top: 5px;
+            margin-top: 3px;
         }
 
         .recording-type {
             background: #D2691E;
-            padding: 4px 8px;
+            padding: 3px 8px;
             border-radius: 12px;
-            font-size: 0.8rem;
+            font-size: 0.7rem;
             margin-left: 10px;
+            white-space: nowrap;
         }
 
         .recording-controls {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             flex-wrap: wrap;
+            align-items: center;
         }
 
         .playback-controls {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-top: 10px;
+            gap: 8px;
+            margin-top: 8px;
             flex-wrap: wrap;
         }
 
@@ -209,12 +230,17 @@
             color: white;
             border: 1px solid #D2691E;
             border-radius: 5px;
-            padding: 5px;
+            padding: 3px;
+            font-size: 0.8rem;
         }
 
         .speed-control select option {
             background: #8B4513;
             color: white;
+        }
+
+        .speed-control label {
+            font-size: 0.8rem;
         }
 
         .status {
@@ -263,7 +289,8 @@
 
         .audio-player {
             width: 100%;
-            margin: 10px 0;
+            margin: 5px 0;
+            height: 30px;
         }
 
         .recording-visualizer {
@@ -276,6 +303,67 @@
             align-items: center;
             justify-content: center;
             color: #F5DEB3;
+        }
+
+        .compact-controls {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .compact-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid #D2691E;
+            border-radius: 5px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: all 0.3s ease;
+        }
+
+        .compact-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .compact-btn.danger {
+            background: rgba(220, 20, 60, 0.3);
+            border-color: #DC143C;
+        }
+
+        .compact-btn.danger:hover {
+            background: rgba(220, 20, 60, 0.5);
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+        }
+
+        .modal-content {
+            background: rgba(139, 69, 19, 0.95);
+            margin: 15% auto;
+            padding: 30px;
+            border: 2px solid #D2691E;
+            border-radius: 15px;
+            width: 80%;
+            max-width: 400px;
+            text-align: center;
+            color: white;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
         }
     </style>
 </head>
@@ -334,10 +422,24 @@
         </div>
     </div>
 
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <h3>🗑️ Delete Recording</h3>
+            <p>Are you sure you want to delete "<span id="deleteFileName"></span>"?</p>
+            <p style="font-size: 0.9rem; color: #F5DEB3;">This action cannot be undone.</p>
+            <div class="modal-buttons">
+                <button class="btn danger" onclick="confirmDelete()">Delete</button>
+                <button class="btn" onclick="closeDeleteModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let mediaRecorder;
         let audioChunks = [];
         let isRecording = false;
+        let fileToDelete = null;
 
         // Recording functionality
         document.getElementById('startRecord').addEventListener('click', startRecording);
@@ -539,9 +641,9 @@
                     item.innerHTML = `
                         <div class="recording-header">
                             <div class="recording-info">
-                                <div class="recording-name">${recording.filename}</div>
+                                <div class="recording-name" title="${recording.filename}">${recording.filename}</div>
                                 <div class="recording-meta">
-                                    Size: ${formatFileSize(recording.size)} | Created: ${recording.created}
+                                    ${formatFileSize(recording.size)} • ${recording.created}
                                 </div>
                             </div>
                             <span class="recording-type">${typeLabel}</span>
@@ -551,18 +653,21 @@
                                 <source src="/download/${recording.filename}" type="audio/wav">
                                 Your browser does not support the audio element.
                             </audio>
-                            <div class="speed-control">
-                                <label>Speed:</label>
-                                <select onchange="changePlaybackSpeed(this, '${recording.filename}')">
-                                    <option value="0.5">0.5x</option>
-                                    <option value="0.75">0.75x</option>
-                                    <option value="1" selected>1x</option>
-                                    <option value="1.25">1.25x</option>
-                                    <option value="1.5">1.5x</option>
-                                    <option value="2">2x</option>
-                                </select>
+                            <div class="compact-controls">
+                                <div class="speed-control">
+                                    <label>Speed:</label>
+                                    <select onchange="changePlaybackSpeed(this, '${recording.filename}')">
+                                        <option value="0.5">0.5x</option>
+                                        <option value="0.75">0.75x</option>
+                                        <option value="1" selected>1x</option>
+                                        <option value="1.25">1.25x</option>
+                                        <option value="1.5">1.5x</option>
+                                        <option value="2">2x</option>
+                                    </select>
+                                </div>
+                                <button class="compact-btn" onclick="downloadFile('${recording.filename}')" title="Download">⬇️</button>
+                                <button class="compact-btn danger" onclick="showDeleteModal('${recording.filename}')" title="Delete">🗑️</button>
                             </div>
-                            <button class="btn" onclick="downloadFile('${recording.filename}')">Download</button>
                         </div>
                     `;
                     recordingsList.appendChild(item);
@@ -583,12 +688,54 @@
             window.open(`/download/${filename}`, '_blank');
         }
 
+        function showDeleteModal(filename) {
+            fileToDelete = filename;
+            document.getElementById('deleteFileName').textContent = filename;
+            document.getElementById('deleteModal').style.display = 'block';
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').style.display = 'none';
+            fileToDelete = null;
+        }
+
+        async function confirmDelete() {
+            if (!fileToDelete) return;
+
+            try {
+                const response = await fetch(`/delete/${fileToDelete}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showStatus(data.message, 'success', 'uploadStatus');
+                    loadRecordings();
+                } else {
+                    showStatus(data.error, 'error', 'uploadStatus');
+                }
+            } catch (error) {
+                showStatus('Error deleting file: ' + error.message, 'error', 'uploadStatus');
+            }
+
+            closeDeleteModal();
+        }
+
         function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
+            if (bytes === 0) return '0 B';
             const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const sizes = ['B', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('deleteModal');
+            if (event.target === modal) {
+                closeDeleteModal();
+            }
         }
 
         // Load recordings on page load

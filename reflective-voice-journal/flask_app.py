@@ -67,6 +67,21 @@ def save_recording():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/delete/<filename>', methods=['DELETE'])
+def delete_file(filename):
+    try:
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            return jsonify({
+                'success': True,
+                'message': f'File {filename} deleted successfully'
+            })
+        else:
+            return jsonify({'error': 'File not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/recordings')
 def list_recordings():
     try:
