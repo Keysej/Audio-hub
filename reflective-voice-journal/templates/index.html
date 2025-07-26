@@ -16,13 +16,13 @@
             background: linear-gradient(135deg, #8B4513 0%, #A0522D 50%, #CD853F 100%);
             min-height: 100vh;
             padding: 20px;
-            color: white;
+            color: black;
         }
 
         .container {
             max-width: 900px;
             margin: 0 auto;
-            background: rgba(139, 69, 19, 0.9);
+            background: rgba(255, 255, 255, 0.95);
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.3);
             overflow: hidden;
@@ -56,19 +56,19 @@
             margin-bottom: 40px;
             padding: 30px;
             border-radius: 15px;
-            background: rgba(160, 82, 45, 0.8);
+            background: rgba(255, 255, 255, 0.9);
             border: 2px solid #D2691E;
-            color: white;
+            color: black;
         }
 
         .section h2 {
-            color: white;
+            color: #8B4513;
             margin-bottom: 20px;
             font-size: 1.5rem;
             display: flex;
             align-items: center;
             gap: 10px;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
         }
 
         .recording-controls {
@@ -128,20 +128,20 @@
             border-radius: 10px;
             padding: 40px;
             text-align: center;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.8);
             transition: all 0.3s ease;
             cursor: pointer;
-            color: white;
+            color: black;
         }
 
         .upload-area:hover {
             border-color: #CD853F;
-            background: rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.9);
         }
 
         .upload-area.dragover {
             border-color: #CD853F;
-            background: rgba(255,255,255,0.2);
+            background: rgba(255,255,255,1);
         }
 
         .file-input {
@@ -153,17 +153,17 @@
         }
 
         .recording-item {
-            background: rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.8);
             padding: 15px;
             border-radius: 10px;
             margin-bottom: 10px;
             border: 1px solid #D2691E;
-            color: white;
+            color: black;
             transition: all 0.3s ease;
         }
 
         .recording-item:hover {
-            background: rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.95);
             transform: translateY(-2px);
         }
 
@@ -181,7 +181,7 @@
 
         .recording-name {
             font-weight: bold;
-            color: white;
+            color: #8B4513;
             font-size: 0.95rem;
             white-space: nowrap;
             overflow: hidden;
@@ -191,12 +191,13 @@
 
         .recording-meta {
             font-size: 0.8rem;
-            color: #F5DEB3;
+            color: #666;
             margin-top: 3px;
         }
 
         .recording-type {
             background: #D2691E;
+            color: white;
             padding: 3px 8px;
             border-radius: 12px;
             font-size: 0.7rem;
@@ -226,8 +227,8 @@
         }
 
         .speed-control select {
-            background: rgba(255,255,255,0.2);
-            color: white;
+            background: rgba(255,255,255,0.9);
+            color: black;
             border: 1px solid #D2691E;
             border-radius: 5px;
             padding: 3px;
@@ -235,12 +236,13 @@
         }
 
         .speed-control select option {
-            background: #8B4513;
-            color: white;
+            background: white;
+            color: black;
         }
 
         .speed-control label {
             font-size: 0.8rem;
+            color: black;
         }
 
         .status {
@@ -269,11 +271,11 @@
             display: none;
             text-align: center;
             padding: 20px;
-            color: white;
+            color: black;
         }
 
         .spinner {
-            border: 3px solid rgba(255,255,255,0.3);
+            border: 3px solid rgba(139, 69, 19, 0.3);
             border-top: 3px solid #D2691E;
             border-radius: 50%;
             width: 30px;
@@ -296,13 +298,13 @@
         .recording-visualizer {
             width: 100%;
             height: 60px;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.8);
             border-radius: 5px;
             margin: 10px 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #F5DEB3;
+            color: #8B4513;
         }
 
         .compact-controls {
@@ -312,8 +314,8 @@
         }
 
         .compact-btn {
-            background: rgba(255,255,255,0.2);
-            color: white;
+            background: rgba(255,255,255,0.8);
+            color: #8B4513;
             border: 1px solid #D2691E;
             border-radius: 5px;
             padding: 4px 8px;
@@ -323,16 +325,17 @@
         }
 
         .compact-btn:hover {
-            background: rgba(255,255,255,0.3);
+            background: rgba(255,255,255,1);
         }
 
         .compact-btn.danger {
-            background: rgba(220, 20, 60, 0.3);
+            background: rgba(220, 20, 60, 0.8);
             border-color: #DC143C;
+            color: white;
         }
 
         .compact-btn.danger:hover {
-            background: rgba(220, 20, 60, 0.5);
+            background: rgba(220, 20, 60, 1);
         }
 
         /* Modal styles */
@@ -348,7 +351,7 @@
         }
 
         .modal-content {
-            background: rgba(139, 69, 19, 0.95);
+            background: rgba(255, 255, 255, 0.95);
             margin: 15% auto;
             padding: 30px;
             border: 2px solid #D2691E;
@@ -356,7 +359,7 @@
             width: 80%;
             max-width: 400px;
             text-align: center;
-            color: white;
+            color: black;
         }
 
         .modal-buttons {
@@ -400,7 +403,7 @@
                         <button class="btn" onclick="document.getElementById('fileInput').click()">
                             Choose File
                         </button>
-                        <p style="margin-top: 10px; font-size: 0.9rem; color: #F5DEB3;">
+                        <p style="margin-top: 10px; font-size: 0.9rem; color: #666;">
                             Supported formats: .wav, .mp3
                         </p>
                     </div>
@@ -427,7 +430,7 @@
         <div class="modal-content">
             <h3>🗑️ Delete Recording</h3>
             <p>Are you sure you want to delete "<span id="deleteFileName"></span>"?</p>
-            <p style="font-size: 0.9rem; color: #F5DEB3;">This action cannot be undone.</p>
+            <p style="font-size: 0.9rem; color: #666;">This action cannot be undone.</p>
             <div class="modal-buttons">
                 <button class="btn danger" onclick="confirmDelete()">Delete</button>
                 <button class="btn" onclick="closeDeleteModal()">Cancel</button>
@@ -512,7 +515,7 @@
             document.getElementById('saveRecord').disabled = true;
             
             document.getElementById('visualizer').innerHTML = 'Click "Start Recording" to begin';
-            document.getElementById('visualizer').style.background = 'rgba(255,255,255,0.1)';
+            document.getElementById('visualizer').style.background = 'rgba(255,255,255,0.8)';
             
             showStatus('Recording reset', 'info', 'recordingStatus');
         }
@@ -628,7 +631,7 @@
                 loading.style.display = 'none';
                 
                 if (recordings.length === 0) {
-                    recordingsList.innerHTML = '<p style="text-align: center; color: #F5DEB3;">No recordings found</p>';
+                    recordingsList.innerHTML = '<p style="text-align: center; color: #666;">No recordings found</p>';
                     return;
                 }
 
