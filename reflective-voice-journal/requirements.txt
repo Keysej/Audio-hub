@@ -1,2 +1,2 @@
-streamlit
-st-audiorec
+flask
+werkzeug
