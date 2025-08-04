@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "flask_app.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/flask_app.py"
+    }
+  ],
+  "functions": {
+    "flask_app.py": {
+      "runtime": "python3.9"
+    }
+  }
+} 
