@@ -240,14 +240,58 @@ function hideRecordingSection() {
   document.getElementById('recording-time').textContent = '00:00';
 }
 
-// Play audio
+// Global audio player to control playback
+let currentAudio = null;
+let currentPlayButton = null;
+
+// Play/pause audio with proper controls
 function playAudio(dropId) {
   const drops = getSoundDrops();
   const drop = drops.find(d => d.id == dropId);
-  if (drop) {
-    const audio = new Audio(drop.audioData);
-    audio.play();
+  const playButton = document.querySelector(`button[onclick="playAudio('${dropId}')"]`);
+  
+  if (!drop || !playButton) return;
+  
+  // If there's already audio playing, stop it first
+  if (currentAudio && !currentAudio.paused) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+    if (currentPlayButton) {
+      currentPlayButton.innerHTML = '<i class="fa-solid fa-play"></i>';
+    }
   }
+  
+  // If clicking the same button that's currently playing, just stop
+  if (currentAudio && currentPlayButton === playButton && currentAudio.src === drop.audioData) {
+    currentAudio = null;
+    currentPlayButton = null;
+    return;
+  }
+  
+  // Create new audio and play
+  currentAudio = new Audio(drop.audioData);
+  currentPlayButton = playButton;
+  
+  // Update button to show pause icon
+  playButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
+  
+  // Play the audio
+  currentAudio.play().catch(error => {
+    console.error('Error playing audio:', error);
+    playButton.innerHTML = '<i class="fa-solid fa-play"></i>';
+  });
+  
+  // When audio ends, reset button
+  currentAudio.addEventListener('ended', () => {
+    playButton.innerHTML = '<i class="fa-solid fa-play"></i>';
+    currentAudio = null;
+    currentPlayButton = null;
+  });
+  
+  // Handle pause event
+  currentAudio.addEventListener('pause', () => {
+    playButton.innerHTML = '<i class="fa-solid fa-play"></i>';
+  });
 }
 
 // Download audio
