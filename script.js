@@ -44,7 +44,7 @@ function getTodaysTheme() {
   return themes[dayOfYear % themes.length];
 }
 
-// Get sound drops from shared API
+// Get sound drops from shared API with localStorage fallback
 async function getSoundDrops() {
   try {
     console.log('Fetching sound drops from API...');
@@ -54,14 +54,35 @@ async function getSoundDrops() {
     if (response.ok) {
       const data = await response.json();
       console.log('Fetched sound drops:', data.length, 'drops');
+      
+      // Store in localStorage as backup
+      localStorage.setItem('soundDropsBackup', JSON.stringify(data));
       return data;
     } else {
       const errorText = await response.text();
       console.error('Failed to fetch sound drops:', response.status, errorText);
-      return [];
+      return getLocalBackup();
     }
   } catch (error) {
     console.error('Error fetching sound drops:', error);
+    return getLocalBackup();
+  }
+}
+
+// Get sound drops from localStorage backup
+function getLocalBackup() {
+  try {
+    const stored = localStorage.getItem('soundDropsBackup');
+    const drops = stored ? JSON.parse(stored) : [];
+    
+    // Filter out drops older than 24 hours
+    const now = Date.now();
+    const validDrops = drops.filter(drop => (now - drop.timestamp) < 24 * 60 * 60 * 1000);
+    
+    console.log('Using localStorage backup:', validDrops.length, 'drops');
+    return validDrops;
+  } catch (error) {
+    console.error('Error reading localStorage backup:', error);
     return [];
   }
 }
@@ -95,14 +116,60 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
       if (response.ok) {
         const result = await response.json();
         console.log('Sound drop saved successfully:', result);
+        
+        // Add to localStorage backup immediately
+        const backup = getLocalBackup();
+        backup.unshift(result.drop);
+        localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
+        
         await renderSoundDrops(); // Re-render to show all drops including new one
         await updateStats();
       } else {
         const errorText = await response.text();
         console.error('Failed to save sound drop:', response.status, errorText);
+        
+        // Fallback: save to localStorage only
+        console.log('Saving to localStorage as fallback');
+        const drop = {
+          id: Date.now(),
+          timestamp: Date.now(),
+          theme: getTodaysTheme().title,
+          audioData: reader.result,
+          context: context || '',
+          type: type,
+          filename: filename || `recording_${Date.now()}`,
+          discussions: []
+        };
+        
+        const backup = getLocalBackup();
+        backup.unshift(drop);
+        localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
+        
+        await renderSoundDrops();
+        await updateStats();
       }
     } catch (error) {
       console.error('Error saving sound drop:', error);
+      
+      // Network error fallback: save to localStorage only
+      console.log('Network error - saving to localStorage as fallback');
+      const drop = {
+        id: Date.now(),
+        timestamp: Date.now(),
+        theme: getTodaysTheme().title,
+        audioData: reader.result,
+        context: context || '',
+        type: type,
+        filename: filename || `recording_${Date.now()}`,
+        discussions: []
+      };
+      
+      const backup = getLocalBackup();
+      backup.unshift(drop);
+      localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
+      
+      await renderSoundDrops();
+      await updateStats();
     }
   };
   
