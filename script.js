@@ -47,11 +47,17 @@ function getTodaysTheme() {
 // Get sound drops from shared API
 async function getSoundDrops() {
   try {
+    console.log('Fetching sound drops from API...');
     const response = await fetch('/api/sound-drops');
+    console.log('API response status:', response.status);
+    
     if (response.ok) {
-      return await response.json();
+      const data = await response.json();
+      console.log('Fetched sound drops:', data.length, 'drops');
+      return data;
     } else {
-      console.error('Failed to fetch sound drops');
+      const errorText = await response.text();
+      console.error('Failed to fetch sound drops:', response.status, errorText);
       return [];
     }
   } catch (error) {
@@ -62,6 +68,7 @@ async function getSoundDrops() {
 
 // Save sound drop to shared API
 async function saveSoundDrop(audioBlob, context, type, filename) {
+  console.log('Saving sound drop:', { type, filename, context });
   const reader = new FileReader();
   
   reader.onload = async function() {
@@ -73,6 +80,8 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
         filename: filename || `recording_${Date.now()}`
       };
       
+      console.log('Sending to API:', dropData);
+      
       const response = await fetch('/api/sound-drops', {
         method: 'POST',
         headers: {
@@ -81,13 +90,16 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
         body: JSON.stringify(dropData)
       });
       
+      console.log('API response status:', response.status);
+      
       if (response.ok) {
         const result = await response.json();
-        console.log('Sound drop saved:', result.message);
+        console.log('Sound drop saved successfully:', result);
         await renderSoundDrops(); // Re-render to show all drops including new one
         await updateStats();
       } else {
-        console.error('Failed to save sound drop');
+        const errorText = await response.text();
+        console.error('Failed to save sound drop:', response.status, errorText);
       }
     } catch (error) {
       console.error('Error saving sound drop:', error);
@@ -189,9 +201,9 @@ async function startRecording() {
       const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
       // Show save interface
       document.getElementById('save-drop-btn').style.display = 'block';
-      document.getElementById('save-drop-btn').onclick = () => {
+      document.getElementById('save-drop-btn').onclick = async () => {
         const context = document.getElementById('sound-context').value;
-        saveSoundDrop(audioBlob, context, 'recorded');
+        await saveSoundDrop(audioBlob, context, 'recorded');
         hideRecordingSection();
       };
     };
@@ -476,11 +488,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   
   // File upload
-  document.getElementById('file-upload').addEventListener('change', (e) => {
+  document.getElementById('file-upload').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (file) {
       const context = prompt(`How does this sound relate to today's theme: "${theme.title}"?`);
-      saveSoundDrop(file, context, 'uploaded', file.name);
+      await saveSoundDrop(file, context, 'uploaded', file.name);
     }
   });
   

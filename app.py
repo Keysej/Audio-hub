@@ -367,6 +367,6 @@ def upload_audio():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# For Vercel
-def handler(request):
-    return app(request.environ, lambda status, headers: None)
+# For Vercel deployment
+if __name__ == '__main__':
+    app.run(debug=True)
