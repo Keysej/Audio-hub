@@ -44,53 +44,63 @@ function getTodaysTheme() {
   return themes[dayOfYear % themes.length];
 }
 
-// Get sound drops from localStorage
-function getSoundDrops() {
-  const stored = localStorage.getItem('soundDrops');
-  const drops = stored ? JSON.parse(stored) : [];
-  
-  // Filter out drops older than 24 hours
-  const now = Date.now();
-  const validDrops = drops.filter(drop => (now - drop.timestamp) < 24 * 60 * 60 * 1000);
-  
-  // Update localStorage if we filtered any out
-  if (validDrops.length !== drops.length) {
-    localStorage.setItem('soundDrops', JSON.stringify(validDrops));
+// Get sound drops from shared API
+async function getSoundDrops() {
+  try {
+    const response = await fetch('/api/sound-drops');
+    if (response.ok) {
+      return await response.json();
+    } else {
+      console.error('Failed to fetch sound drops');
+      return [];
+    }
+  } catch (error) {
+    console.error('Error fetching sound drops:', error);
+    return [];
   }
-  
-  return validDrops;
 }
 
-// Save sound drop
-function saveSoundDrop(audioBlob, context, type, filename) {
-  const drops = getSoundDrops();
+// Save sound drop to shared API
+async function saveSoundDrop(audioBlob, context, type, filename) {
   const reader = new FileReader();
   
-  reader.onload = function() {
-    const drop = {
-      id: Date.now(),
-      timestamp: Date.now(),
-      theme: getTodaysTheme().title,
-      audioData: reader.result,
-      context: context || '',
-      type: type, // 'recorded' or 'uploaded'
-      filename: filename || `recording_${Date.now()}`,
-      discussions: []
-    };
-    
-    drops.unshift(drop);
-    localStorage.setItem('soundDrops', JSON.stringify(drops));
-    renderSoundDrops();
-    updateStats();
+  reader.onload = async function() {
+    try {
+      const dropData = {
+        audioData: reader.result,
+        context: context || '',
+        type: type, // 'recorded' or 'uploaded'
+        filename: filename || `recording_${Date.now()}`
+      };
+      
+      const response = await fetch('/api/sound-drops', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(dropData)
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Sound drop saved:', result.message);
+        await renderSoundDrops(); // Re-render to show all drops including new one
+        await updateStats();
+      } else {
+        console.error('Failed to save sound drop');
+      }
+    } catch (error) {
+      console.error('Error saving sound drop:', error);
+    }
   };
   
   reader.readAsDataURL(audioBlob);
 }
 
 // Render sound drops
-function renderSoundDrops(filter = 'all') {
+async function renderSoundDrops(filter = 'all') {
   const container = document.getElementById('sound-drops');
-  const drops = getSoundDrops();
+  const drops = await getSoundDrops();
   
   let filteredDrops = drops;
   if (filter === 'recorded') filteredDrops = drops.filter(d => d.type === 'recorded');
@@ -156,8 +166,8 @@ function updateCountdown() {
 }
 
 // Update stats
-function updateStats() {
-  const drops = getSoundDrops();
+async function updateStats() {
+  const drops = await getSoundDrops();
   const totalDiscussions = drops.reduce((sum, drop) => sum + drop.discussions.length, 0);
   
   document.getElementById('drop-count').textContent = drops.length;
@@ -245,8 +255,8 @@ let currentAudio = null;
 let currentPlayButton = null;
 
 // Play/pause audio with proper controls
-function playAudio(dropId) {
-  const drops = getSoundDrops();
+async function playAudio(dropId) {
+  const drops = await getSoundDrops();
   const drop = drops.find(d => d.id == dropId);
   const playButton = document.querySelector(`button[onclick="playAudio('${dropId}')"]`);
   
@@ -295,8 +305,8 @@ function playAudio(dropId) {
 }
 
 // Download audio
-function downloadAudio(dropId) {
-  const drops = getSoundDrops();
+async function downloadAudio(dropId) {
+  const drops = await getSoundDrops();
   const drop = drops.find(d => d.id == dropId);
   if (drop) {
     const a = document.createElement('a');
@@ -307,8 +317,8 @@ function downloadAudio(dropId) {
 }
 
 // Open discussion modal
-function openDiscussion(dropId) {
-  const drops = getSoundDrops();
+async function openDiscussion(dropId) {
+  const drops = await getSoundDrops();
   const drop = drops.find(d => d.id == dropId);
   if (!drop) return;
   
@@ -375,7 +385,7 @@ function renderComments(comments) {
 }
 
 // Add comment to a sound drop
-function addComment(dropId) {
+async function addComment(dropId) {
   const textarea = document.getElementById(`new-comment-${dropId}`);
   const commentText = textarea.value.trim();
   
@@ -384,46 +394,58 @@ function addComment(dropId) {
     return;
   }
   
-  const drops = getSoundDrops();
-  const dropIndex = drops.findIndex(d => d.id == dropId);
-  
-  if (dropIndex === -1) return;
-  
-  // Add new comment
-  const newComment = {
-    id: Date.now(),
-    timestamp: Date.now(),
-    text: commentText,
-    author: 'Researcher' // Could be expanded to include actual user names
-  };
-  
-  drops[dropIndex].discussions.push(newComment);
-  
-  // Save to localStorage
-  localStorage.setItem('soundDrops', JSON.stringify(drops));
-  
-  // Update the comments display
-  const commentsList = document.getElementById(`comments-list-${dropId}`);
-  if (commentsList) {
-    commentsList.innerHTML = renderComments(drops[dropIndex].discussions);
+  try {
+    const response = await fetch(`/api/sound-drops/${dropId}/discussion`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        text: commentText,
+        author: 'Researcher'
+      })
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      
+      // Get updated drops to refresh display
+      const drops = await getSoundDrops();
+      const drop = drops.find(d => d.id == dropId);
+      
+      if (drop) {
+        // Update the comments display
+        const commentsList = document.getElementById(`comments-list-${dropId}`);
+        if (commentsList) {
+          commentsList.innerHTML = renderComments(drop.discussions);
+        }
+        
+        // Update the discussion count in the modal header
+        const modalHeader = document.querySelector('.discussion-modal-content h4');
+        if (modalHeader) {
+          modalHeader.textContent = `Comments (${drop.discussions.length})`;
+        }
+      }
+      
+      // Clear the textarea
+      textarea.value = '';
+      
+      // Update the main page
+      await renderSoundDrops();
+      await updateStats();
+      
+    } else {
+      console.error('Failed to add comment');
+      alert('Failed to add comment. Please try again.');
+    }
+  } catch (error) {
+    console.error('Error adding comment:', error);
+    alert('Error adding comment. Please try again.');
   }
-  
-  // Update the discussion count in the modal header
-  const modalHeader = document.querySelector('.discussion-modal-content h4');
-  if (modalHeader) {
-    modalHeader.textContent = `Comments (${drops[dropIndex].discussions.length})`;
-  }
-  
-  // Clear the textarea
-  textarea.value = '';
-  
-  // Update the main page
-  renderSoundDrops();
-  updateStats();
 }
 
 // Initialize app
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   // Set today's theme
   const theme = getTodaysTheme();
   document.getElementById('daily-theme').textContent = `"${theme.title}"`;
@@ -434,10 +456,10 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(updateCountdown, 1000);
   
   // Update stats
-  updateStats();
+  await updateStats();
   
   // Render sound drops
-  renderSoundDrops();
+  await renderSoundDrops();
   
   // Event listeners
   document.getElementById('drop-sound-btn').addEventListener('click', showRecordingSection);
@@ -446,10 +468,10 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Filter buttons
   document.querySelectorAll('.filter-tag').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', async (e) => {
       document.querySelectorAll('.filter-tag').forEach(b => b.classList.remove('active'));
       e.target.classList.add('active');
-      renderSoundDrops(e.target.dataset.filter);
+      await renderSoundDrops(e.target.dataset.filter);
     });
   });
   
@@ -462,10 +484,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   
-  // Clean up old drops every hour
-  setInterval(() => {
-    getSoundDrops(); // This will clean up old drops
-    renderSoundDrops();
-    updateStats();
-  }, 60 * 60 * 1000);
+  // Refresh data every 30 seconds to show new drops from other users
+  setInterval(async () => {
+    await renderSoundDrops();
+    await updateStats();
+  }, 30 * 1000);
 });
