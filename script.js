@@ -291,8 +291,29 @@ function updateStatsFromData(drops) {
 // Start recording
 async function startRecording() {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream);
+    // Enhanced audio constraints for better mobile compatibility
+    const constraints = {
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 44100
+      }
+    };
+    
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    
+    // Check for MediaRecorder support and use best available format
+    let options = {};
+    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+      options.mimeType = 'audio/webm;codecs=opus';
+    } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+      options.mimeType = 'audio/mp4';
+    } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+      options.mimeType = 'audio/wav';
+    }
+    
+    mediaRecorder = new MediaRecorder(stream, options);
     audioChunks = [];
     
     mediaRecorder.ondataavailable = event => {
@@ -322,7 +343,25 @@ async function startRecording() {
     
   } catch (error) {
     console.error('Error accessing microphone:', error);
-    alert('Could not access microphone. Please check permissions.');
+    
+    // Provide more specific error messages for different scenarios
+    let errorMessage = 'Could not access microphone. ';
+    if (error.name === 'NotAllowedError') {
+      errorMessage += 'Please allow microphone permissions and try again.';
+    } else if (error.name === 'NotFoundError') {
+      errorMessage += 'No microphone found on this device.';
+    } else if (error.name === 'NotSupportedError') {
+      errorMessage += 'Audio recording is not supported on this browser.';
+    } else {
+      errorMessage += 'Please check your microphone settings and try again.';
+    }
+    
+    alert(errorMessage);
+    
+    // Reset UI on error
+    document.getElementById('record-btn').style.display = 'block';
+    document.getElementById('stop-btn').style.display = 'none';
+    document.getElementById('recording-time').textContent = '00:00';
   }
 }
 
@@ -559,8 +598,45 @@ async function addComment(dropId) {
   }
 }
 
+// Check device capabilities
+function checkDeviceCapabilities() {
+  const capabilities = {
+    mediaRecorder: typeof MediaRecorder !== 'undefined',
+    getUserMedia: navigator.mediaDevices && navigator.mediaDevices.getUserMedia,
+    audioContext: typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined',
+    localStorage: typeof Storage !== 'undefined'
+  };
+  
+  console.log('Device capabilities:', capabilities);
+  
+  // Show warning if critical features are missing
+  if (!capabilities.mediaRecorder || !capabilities.getUserMedia) {
+    const warningDiv = document.createElement('div');
+    warningDiv.style.cssText = `
+      background: #fff3cd; 
+      border: 1px solid #ffeaa7; 
+      color: #856404; 
+      padding: 15px; 
+      margin: 10px 0; 
+      border-radius: 8px; 
+      text-align: center;
+    `;
+    warningDiv.innerHTML = `
+      <strong>⚠️ Limited Functionality:</strong> 
+      Audio recording may not work properly on this device/browser. 
+      You can still listen to others' recordings and participate in discussions.
+    `;
+    document.querySelector('.container').insertBefore(warningDiv, document.querySelector('.theme-section'));
+  }
+  
+  return capabilities;
+}
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
+  // Check device capabilities first
+  const capabilities = checkDeviceCapabilities();
+  
   // Set today's theme
   const theme = getTodaysTheme();
   document.getElementById('daily-theme').textContent = `"${theme.title}"`;
