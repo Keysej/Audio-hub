@@ -3,11 +3,39 @@ import datetime
 import base64
 import os
 import json
+import tempfile
 
 app = Flask(__name__)
 
-# In-memory storage for sound drops (in production, use a database)
-sound_drops = []
+# File-based storage for Vercel serverless environment
+STORAGE_FILE = '/tmp/sound_drops.json'
+
+def load_sound_drops():
+    """Load sound drops from file storage"""
+    try:
+        if os.path.exists(STORAGE_FILE):
+            with open(STORAGE_FILE, 'r') as f:
+                data = json.load(f)
+                # Clean old drops (24 hours)
+                now = datetime.datetime.now().timestamp() * 1000
+                valid_drops = [drop for drop in data if (now - drop['timestamp']) < 24 * 60 * 60 * 1000]
+                return valid_drops
+        return []
+    except Exception as e:
+        print(f"Error loading sound drops: {e}")
+        return []
+
+def save_sound_drops(drops):
+    """Save sound drops to file storage"""
+    try:
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(STORAGE_FILE), exist_ok=True)
+        with open(STORAGE_FILE, 'w') as f:
+            json.dump(drops, f)
+        return True
+    except Exception as e:
+        print(f"Error saving sound drops: {e}")
+        return False
 
 # HTML template for the voice journaling interface
 JOURNAL_TEMPLATE = """
@@ -214,6 +242,24 @@ JOURNAL_TEMPLATE = """
 def index():
     return render_template_string(JOURNAL_TEMPLATE)
 
+@app.route('/api/status')
+def api_status():
+    """Simple status endpoint to check API health and data"""
+    try:
+        drops = load_sound_drops()
+        return jsonify({
+            'status': 'healthy',
+            'drops_count': len(drops),
+            'storage_file': STORAGE_FILE,
+            'timestamp': datetime.datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.datetime.now().isoformat()
+        }), 500
+
 # Helper function to get current theme
 def get_current_theme():
     themes = [
@@ -251,16 +297,10 @@ def get_current_theme():
     day_of_year = today.timetuple().tm_yday
     return themes[day_of_year % len(themes)]
 
-# Helper function to clean old drops (24 hour ephemeral)
-def clean_old_drops():
-    global sound_drops
-    now = datetime.datetime.now().timestamp() * 1000
-    sound_drops = [drop for drop in sound_drops if (now - drop['timestamp']) < 24 * 60 * 60 * 1000]
-
 @app.route('/api/sound-drops', methods=['GET'])
 def get_sound_drops():
-    clean_old_drops()
-    return jsonify(sound_drops)
+    drops = load_sound_drops()
+    return jsonify(drops)
 
 @app.route('/api/sound-drops', methods=['POST'])
 def create_sound_drop():
@@ -283,14 +323,18 @@ def create_sound_drop():
             'discussions': []
         }
         
-        # Add to shared storage
-        sound_drops.insert(0, drop)
-        clean_old_drops()
+        # Load existing drops and add new one
+        drops = load_sound_drops()
+        drops.insert(0, drop)
         
-        return jsonify({
-            'message': 'Sound drop saved successfully!',
-            'drop': drop
-        })
+        # Save back to storage
+        if save_sound_drops(drops):
+            return jsonify({
+                'message': 'Sound drop saved successfully!',
+                'drop': drop
+            })
+        else:
+            return jsonify({'error': 'Failed to save sound drop'}), 500
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -303,9 +347,11 @@ def add_discussion(drop_id):
         if not data or 'text' not in data:
             return jsonify({'error': 'No comment text provided'}), 400
         
-        # Find the drop
-        drop = next((d for d in sound_drops if d['id'] == drop_id), None)
-        if not drop:
+        # Load drops and find the specific one
+        drops = load_sound_drops()
+        drop_index = next((i for i, d in enumerate(drops) if d['id'] == drop_id), None)
+        
+        if drop_index is None:
             return jsonify({'error': 'Sound drop not found'}), 404
         
         # Add comment
@@ -316,12 +362,16 @@ def add_discussion(drop_id):
             'author': data.get('author', 'Researcher')
         }
         
-        drop['discussions'].append(comment)
+        drops[drop_index]['discussions'].append(comment)
         
-        return jsonify({
-            'message': 'Comment added successfully!',
-            'comment': comment
-        })
+        # Save back to storage
+        if save_sound_drops(drops):
+            return jsonify({
+                'message': 'Comment added successfully!',
+                'comment': comment
+            })
+        else:
+            return jsonify({'error': 'Failed to save comment'}), 500
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -355,14 +405,18 @@ def upload_audio():
             'discussions': []
         }
         
-        # Add to shared storage
-        sound_drops.insert(0, drop)
-        clean_old_drops()
+        # Load existing drops and add new one
+        drops = load_sound_drops()
+        drops.insert(0, drop)
         
-        return jsonify({
-            'message': f'Audio {audio_type} successfully!',
-            'drop': drop
-        })
+        # Save back to storage
+        if save_sound_drops(drops):
+            return jsonify({
+                'message': f'Audio {audio_type} successfully!',
+                'drop': drop
+            })
+        else:
+            return jsonify({'error': 'Failed to save audio drop'}), 500
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500

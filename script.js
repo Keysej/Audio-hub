@@ -578,6 +578,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     await updateStatsFromData(localData);
   }
   
+  // Check API status first
+  try {
+    const statusResponse = await fetch('/api/status');
+    if (statusResponse.ok) {
+      const status = await statusResponse.json();
+      console.log('API Status:', status);
+    }
+  } catch (error) {
+    console.error('API status check failed:', error);
+  }
+  
   // Then try to get fresh data from API and merge
   const freshData = await getSoundDrops();
   await renderSoundDropsFromData(freshData);
