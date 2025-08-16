@@ -55,9 +55,15 @@ async function getSoundDrops() {
       const data = await response.json();
       console.log('Fetched sound drops:', data.length, 'drops');
       
-      // Store in localStorage as backup
-      localStorage.setItem('soundDropsBackup', JSON.stringify(data));
-      return data;
+      // Get local backup to merge with API data
+      const localBackup = getLocalBackup();
+      
+      // Merge API data with local backup (API data takes precedence, but keep local-only items)
+      const mergedData = mergeDrops(data, localBackup);
+      
+      // Store merged data as backup
+      localStorage.setItem('soundDropsBackup', JSON.stringify(mergedData));
+      return mergedData;
     } else {
       const errorText = await response.text();
       console.error('Failed to fetch sound drops:', response.status, errorText);
@@ -69,16 +75,32 @@ async function getSoundDrops() {
   }
 }
 
+// Merge API drops with local backup drops
+function mergeDrops(apiDrops, localDrops) {
+  const merged = [...apiDrops];
+  
+  // Add local drops that aren't in API data
+  localDrops.forEach(localDrop => {
+    const existsInApi = apiDrops.some(apiDrop => apiDrop.id === localDrop.id);
+    if (!existsInApi) {
+      merged.push(localDrop);
+    }
+  });
+  
+  // Sort by timestamp (newest first)
+  return merged.sort((a, b) => b.timestamp - a.timestamp);
+}
+
 // Get sound drops from localStorage backup
 function getLocalBackup() {
   try {
     const stored = localStorage.getItem('soundDropsBackup');
-    const drops = stored ? JSON.parse(stored) : [];
-    
-    // Filter out drops older than 24 hours
-    const now = Date.now();
-    const validDrops = drops.filter(drop => (now - drop.timestamp) < 24 * 60 * 60 * 1000);
-    
+  const drops = stored ? JSON.parse(stored) : [];
+  
+  // Filter out drops older than 24 hours
+  const now = Date.now();
+  const validDrops = drops.filter(drop => (now - drop.timestamp) < 24 * 60 * 60 * 1000);
+  
     console.log('Using localStorage backup:', validDrops.length, 'drops');
     return validDrops;
   } catch (error) {
@@ -122,8 +144,9 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
         backup.unshift(result.drop);
         localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
         
-        await renderSoundDrops(); // Re-render to show all drops including new one
-        await updateStats();
+        const freshData = await getSoundDrops();
+        renderSoundDropsFromData(freshData);
+        updateStatsFromData(freshData);
       } else {
         const errorText = await response.text();
         console.error('Failed to save sound drop:', response.status, errorText);
@@ -145,25 +168,26 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
         backup.unshift(drop);
         localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
         
-        await renderSoundDrops();
-        await updateStats();
+        const freshData = getLocalBackup();
+        renderSoundDropsFromData(freshData);
+        updateStatsFromData(freshData);
       }
     } catch (error) {
       console.error('Error saving sound drop:', error);
       
       // Network error fallback: save to localStorage only
       console.log('Network error - saving to localStorage as fallback');
-      const drop = {
-        id: Date.now(),
-        timestamp: Date.now(),
-        theme: getTodaysTheme().title,
-        audioData: reader.result,
-        context: context || '',
+    const drop = {
+      id: Date.now(),
+      timestamp: Date.now(),
+      theme: getTodaysTheme().title,
+      audioData: reader.result,
+      context: context || '',
         type: type,
-        filename: filename || `recording_${Date.now()}`,
-        discussions: []
-      };
-      
+      filename: filename || `recording_${Date.now()}`,
+      discussions: []
+    };
+    
       const backup = getLocalBackup();
       backup.unshift(drop);
       localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
@@ -180,6 +204,12 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
 async function renderSoundDrops(filter = 'all') {
   const container = document.getElementById('sound-drops');
   const drops = await getSoundDrops();
+  renderSoundDropsFromData(drops, filter);
+}
+
+// Render sound drops from provided data
+function renderSoundDropsFromData(drops, filter = 'all') {
+  const container = document.getElementById('sound-drops');
   
   let filteredDrops = drops;
   if (filter === 'recorded') filteredDrops = drops.filter(d => d.type === 'recorded');
@@ -247,6 +277,11 @@ function updateCountdown() {
 // Update stats
 async function updateStats() {
   const drops = await getSoundDrops();
+  updateStatsFromData(drops);
+}
+
+// Update stats from provided data
+function updateStatsFromData(drops) {
   const totalDiscussions = drops.reduce((sum, drop) => sum + drop.discussions.length, 0);
   
   document.getElementById('drop-count').textContent = drops.length;
@@ -480,38 +515,39 @@ async function addComment(dropId) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        text: commentText,
+    text: commentText,
         author: 'Researcher'
       })
     });
-    
+  
     if (response.ok) {
       const result = await response.json();
-      
+  
       // Get updated drops to refresh display
       const drops = await getSoundDrops();
       const drop = drops.find(d => d.id == dropId);
-      
+  
       if (drop) {
-        // Update the comments display
-        const commentsList = document.getElementById(`comments-list-${dropId}`);
-        if (commentsList) {
+  // Update the comments display
+  const commentsList = document.getElementById(`comments-list-${dropId}`);
+  if (commentsList) {
           commentsList.innerHTML = renderComments(drop.discussions);
-        }
-        
-        // Update the discussion count in the modal header
-        const modalHeader = document.querySelector('.discussion-modal-content h4');
-        if (modalHeader) {
+  }
+  
+  // Update the discussion count in the modal header
+  const modalHeader = document.querySelector('.discussion-modal-content h4');
+  if (modalHeader) {
           modalHeader.textContent = `Comments (${drop.discussions.length})`;
         }
-      }
-      
-      // Clear the textarea
-      textarea.value = '';
-      
-      // Update the main page
-      await renderSoundDrops();
-      await updateStats();
+  }
+  
+  // Clear the textarea
+  textarea.value = '';
+  
+  // Update the main page
+      const freshData = await getSoundDrops();
+      renderSoundDropsFromData(freshData);
+      updateStatsFromData(freshData);
       
     } else {
       console.error('Failed to add comment');
@@ -534,11 +570,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateCountdown();
   setInterval(updateCountdown, 1000);
   
-  // Update stats
-  await updateStats();
+  // Always show local backup first for immediate loading
+  const localData = getLocalBackup();
+  if (localData.length > 0) {
+    console.log('Loading', localData.length, 'drops from localStorage for immediate display');
+    await renderSoundDropsFromData(localData);
+    await updateStatsFromData(localData);
+  }
   
-  // Render sound drops
-  await renderSoundDrops();
+  // Then try to get fresh data from API and merge
+  const freshData = await getSoundDrops();
+  await renderSoundDropsFromData(freshData);
+  await updateStatsFromData(freshData);
   
   // Event listeners
   document.getElementById('drop-sound-btn').addEventListener('click', showRecordingSection);
@@ -550,7 +593,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     btn.addEventListener('click', async (e) => {
       document.querySelectorAll('.filter-tag').forEach(b => b.classList.remove('active'));
       e.target.classList.add('active');
-      await renderSoundDrops(e.target.dataset.filter);
+      const freshData = await getSoundDrops();
+      renderSoundDropsFromData(freshData, e.target.dataset.filter);
     });
   });
   
@@ -565,7 +609,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Refresh data every 30 seconds to show new drops from other users
   setInterval(async () => {
-    await renderSoundDrops();
-    await updateStats();
+    const freshData = await getSoundDrops();
+    renderSoundDropsFromData(freshData);
+    updateStatsFromData(freshData);
   }, 30 * 1000);
 });
