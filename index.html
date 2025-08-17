@@ -70,9 +70,20 @@
           </button>
           <span class="recording-time" id="recording-time">00:00</span>
         </div>
+        <div class="audio-preview" id="audio-preview" style="display: none;">
+          <h4>Preview Your Recording:</h4>
+          <audio id="preview-audio" controls style="width: 100%; margin-bottom: 15px;"></audio>
+        </div>
         <div class="recording-context">
           <textarea id="sound-context" placeholder="How does this sound relate to today's theme? (optional)"></textarea>
-          <button class="save-drop-btn" id="save-drop-btn" style="display: none;">Save Drop</button>
+          <div class="recording-actions">
+            <button class="retake-btn" id="retake-btn" style="display: none;">
+              <i class="fa-solid fa-redo"></i> Retake
+            </button>
+            <button class="share-drop-btn" id="share-drop-btn" style="display: none;">
+              <i class="fa-solid fa-share"></i> Share
+            </button>
+          </div>
         </div>
       </div>
     </div>

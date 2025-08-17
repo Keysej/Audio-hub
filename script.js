@@ -323,11 +323,27 @@ async function startRecording() {
     mediaRecorder.onstop = () => {
       const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
       // Show save interface
-      document.getElementById('save-drop-btn').style.display = 'block';
-      document.getElementById('save-drop-btn').onclick = async () => {
+      document.getElementById('share-drop-btn').style.display = 'block';
+      document.getElementById('retake-btn').style.display = 'block';
+      document.getElementById('audio-preview').style.display = 'block';
+      
+      // Set up audio preview
+      const audioUrl = URL.createObjectURL(audioBlob);
+      document.getElementById('preview-audio').src = audioUrl;
+      
+      document.getElementById('share-drop-btn').onclick = async () => {
         const context = document.getElementById('sound-context').value;
         await saveSoundDrop(audioBlob, context, 'recorded');
         hideRecordingSection();
+      };
+      
+      document.getElementById('retake-btn').onclick = () => {
+        // Reset for new recording
+        document.getElementById('share-drop-btn').style.display = 'none';
+        document.getElementById('retake-btn').style.display = 'none';
+        document.getElementById('audio-preview').style.display = 'none';
+        document.getElementById('record-btn').style.display = 'block';
+        document.getElementById('recording-time').textContent = '00:00';
       };
     };
     
@@ -399,7 +415,11 @@ function showRecordingSection() {
 function hideRecordingSection() {
   document.getElementById('recording-section').style.display = 'none';
   document.getElementById('sound-context').value = '';
-  document.getElementById('save-drop-btn').style.display = 'none';
+  document.getElementById('share-drop-btn').style.display = 'none';
+  document.getElementById('retake-btn').style.display = 'none';
+  document.getElementById('audio-preview').style.display = 'none';
+  document.getElementById('record-btn').style.display = 'block';
+  document.getElementById('stop-btn').style.display = 'none';
   document.getElementById('recording-time').textContent = '00:00';
 }
 
