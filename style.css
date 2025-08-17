@@ -576,6 +576,95 @@ body {
   margin-bottom: 8px;
 }
 
+.comment-actions {
+  display: flex;
+  gap: 5px;
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+.comment:hover .comment-actions {
+  opacity: 1;
+}
+
+.edit-comment-btn, .delete-comment-btn {
+  background: none;
+  border: none;
+  color: #7f8c8d;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 0.8em;
+  transition: all 0.3s ease;
+}
+
+.edit-comment-btn:hover {
+  background: #3498db;
+  color: white;
+}
+
+.delete-comment-btn:hover {
+  background: #e74c3c;
+  color: white;
+}
+
+.comment-edit {
+  margin-top: 10px;
+}
+
+.comment-edit textarea {
+  width: 100%;
+  padding: 8px;
+  border: 2px solid #e0e6ed;
+  border-radius: 6px;
+  font-size: 0.9em;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 60px;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+}
+
+.comment-edit textarea:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.save-edit-btn, .cancel-edit-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.8em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.save-edit-btn {
+  background: #27ae60;
+  color: white;
+}
+
+.save-edit-btn:hover {
+  background: #219a52;
+}
+
+.cancel-edit-btn {
+  background: #95a5a6;
+  color: white;
+}
+
+.cancel-edit-btn:hover {
+  background: #7f8c8d;
+}
+
 .comment-author {
   font-weight: 600;
   color: #2c3e50;
@@ -676,6 +765,55 @@ body {
 
 .supported-platforms small {
   font-size: 0.85em;
+}
+
+.welcome-message {
+  margin: 20px 0;
+  background: linear-gradient(135deg, #74b9ff, #0984e3);
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(116, 185, 255, 0.3);
+}
+
+.welcome-content {
+  padding: 25px;
+  color: white;
+  text-align: center;
+}
+
+.welcome-content h3 {
+  margin: 0 0 15px 0;
+  font-size: 1.5em;
+  font-weight: 600;
+}
+
+.welcome-content p {
+  margin: 0 0 15px 0;
+  line-height: 1.6;
+  opacity: 0.95;
+}
+
+.welcome-content p:last-of-type {
+  margin-bottom: 20px;
+}
+
+.dismiss-welcome {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  padding: 10px 20px;
+  border-radius: 25px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dismiss-welcome:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
 }
 
 .about-section {

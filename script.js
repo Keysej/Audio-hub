@@ -553,12 +553,31 @@ function renderComments(comments) {
   }
   
   return comments.map(comment => `
-    <div class="comment">
+    <div class="comment" id="comment-${comment.id}">
       <div class="comment-header">
         <span class="comment-author">Researcher</span>
         <span class="comment-time">${formatTime(comment.timestamp)}</span>
+        <div class="comment-actions">
+          <button class="edit-comment-btn" onclick="editComment('${comment.id}')" title="Edit comment">
+            <i class="fa-solid fa-edit"></i>
+          </button>
+          <button class="delete-comment-btn" onclick="deleteComment('${comment.id}')" title="Delete comment">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
       </div>
-      <div class="comment-text">${comment.text}</div>
+      <div class="comment-text" id="comment-text-${comment.id}">${comment.text}</div>
+      <div class="comment-edit" id="comment-edit-${comment.id}" style="display: none;">
+        <textarea id="edit-textarea-${comment.id}">${comment.text}</textarea>
+        <div class="edit-actions">
+          <button onclick="saveCommentEdit('${comment.id}')" class="save-edit-btn">
+            <i class="fa-solid fa-check"></i> Save
+          </button>
+          <button onclick="cancelCommentEdit('${comment.id}')" class="cancel-edit-btn">
+            <i class="fa-solid fa-times"></i> Cancel
+          </button>
+        </div>
+      </div>
     </div>
   `).join('');
 }
@@ -672,13 +691,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateCountdown();
   setInterval(updateCountdown, 1000);
   
-  // Always show local backup first for immediate loading
+  // Always show local backup first for immediate loading, plus show welcome message for new users
   const localData = getLocalBackup();
+  const isFirstVisit = !localStorage.getItem('hasVisitedBefore');
+  
   if (localData.length > 0) {
     console.log('Loading', localData.length, 'drops from localStorage for immediate display');
     await renderSoundDropsFromData(localData);
     await updateStatsFromData(localData);
+  } else if (isFirstVisit) {
+    // Show welcome message for first-time visitors
+    showWelcomeMessage();
   }
+  
+  // Mark that user has visited
+  localStorage.setItem('hasVisitedBefore', 'true');
   
   // Check API status first
   try {
@@ -852,4 +879,150 @@ async function saveLinkDrop(link, context) {
     renderSoundDropsFromData(freshData);
     updateStatsFromData(freshData);
   }
+}
+
+// Edit comment functionality
+function editComment(commentId) {
+  document.getElementById(`comment-text-${commentId}`).style.display = 'none';
+  document.getElementById(`comment-edit-${commentId}`).style.display = 'block';
+}
+
+function cancelCommentEdit(commentId) {
+  document.getElementById(`comment-text-${commentId}`).style.display = 'block';
+  document.getElementById(`comment-edit-${commentId}`).style.display = 'none';
+}
+
+async function saveCommentEdit(commentId) {
+  const newText = document.getElementById(`edit-textarea-${commentId}`).value.trim();
+  
+  if (!newText) {
+    alert('Comment cannot be empty');
+    return;
+  }
+  
+  try {
+    // Find the drop containing this comment
+    const drops = await getSoundDrops();
+    let targetDrop = null;
+    let commentIndex = -1;
+    
+    for (let drop of drops) {
+      const index = drop.discussions.findIndex(c => c.id == commentId);
+      if (index !== -1) {
+        targetDrop = drop;
+        commentIndex = index;
+        break;
+      }
+    }
+    
+    if (!targetDrop) {
+      alert('Comment not found');
+      return;
+    }
+    
+    // Update comment in the data
+    targetDrop.discussions[commentIndex].text = newText;
+    targetDrop.discussions[commentIndex].edited = true;
+    targetDrop.discussions[commentIndex].editedAt = Date.now();
+    
+    // Save to localStorage
+    await updateCommentInStorage(targetDrop);
+    
+    // Update the display
+    document.getElementById(`comment-text-${commentId}`).textContent = newText;
+    document.getElementById(`comment-text-${commentId}`).style.display = 'block';
+    document.getElementById(`comment-edit-${commentId}`).style.display = 'none';
+    
+    // Add edited indicator
+    const commentHeader = document.querySelector(`#comment-${commentId} .comment-time`);
+    if (!commentHeader.textContent.includes('(edited)')) {
+      commentHeader.textContent += ' (edited)';
+    }
+    
+  } catch (error) {
+    console.error('Error editing comment:', error);
+    alert('Failed to edit comment. Please try again.');
+  }
+}
+
+async function deleteComment(commentId) {
+  if (!confirm('Are you sure you want to delete this comment?')) {
+    return;
+  }
+  
+  try {
+    // Find the drop containing this comment
+    const drops = await getSoundDrops();
+    let targetDrop = null;
+    let commentIndex = -1;
+    
+    for (let drop of drops) {
+      const index = drop.discussions.findIndex(c => c.id == commentId);
+      if (index !== -1) {
+        targetDrop = drop;
+        commentIndex = index;
+        break;
+      }
+    }
+    
+    if (!targetDrop) {
+      alert('Comment not found');
+      return;
+    }
+    
+    // Remove comment from the data
+    targetDrop.discussions.splice(commentIndex, 1);
+    
+    // Save to localStorage
+    await updateCommentInStorage(targetDrop);
+    
+    // Remove from display
+    document.getElementById(`comment-${commentId}`).remove();
+    
+    // Update discussion count in modal header
+    const modalHeader = document.querySelector('.discussion-modal-content h4');
+    if (modalHeader) {
+      modalHeader.textContent = `Comments (${targetDrop.discussions.length})`;
+    }
+    
+    // Update the main page
+    const freshData = await getSoundDrops();
+    renderSoundDropsFromData(freshData);
+    updateStatsFromData(freshData);
+    
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    alert('Failed to delete comment. Please try again.');
+  }
+}
+
+// Helper function to update comment storage
+async function updateCommentInStorage(drop) {
+  // Update localStorage as primary storage for comments
+  const backup = getLocalBackup();
+  const dropIndex = backup.findIndex(d => d.id === drop.id);
+  if (dropIndex !== -1) {
+    backup[dropIndex] = drop;
+    localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
+  }
+}
+
+// Show welcome message for new users
+function showWelcomeMessage() {
+  const welcomeDiv = document.createElement('div');
+  welcomeDiv.className = 'welcome-message';
+  welcomeDiv.innerHTML = `
+    <div class="welcome-content">
+      <h3>🎵 Welcome to SoundDrop!</h3>
+      <p>This is where you'll see all the sounds shared in the last 24 hours. When people record, upload, or share audio links, they'll appear here for everyone to discover and discuss.</p>
+      <p><strong>Be the first to share something!</strong> Use the buttons above to record your sound, upload an audio file, or share a link to audio from YouTube, Spotify, or other platforms.</p>
+      <button onclick="this.parentElement.parentElement.remove()" class="dismiss-welcome">
+        <i class="fa-solid fa-times"></i> Got it!
+      </button>
+    </div>
+  `;
+  
+  // Insert before the sound drops container
+  const soundDropsContainer = document.getElementById('sound-drops');
+  soundDropsContainer.parentNode.insertBefore(welcomeDiv, soundDropsContainer);
 }
