@@ -226,13 +226,19 @@ function renderSoundDropsFromData(drops, filter = 'all') {
         <div class="drop-time">${formatTime(drop.timestamp)}</div>
         <div class="drop-type">${drop.type}</div>
       </div>
-      <div class="waveform">🎵 Audio Waveform</div>
-      <div class="drop-controls">
-        <button class="play-btn" onclick="playAudio('${drop.id}')">
-          <i class="fa-solid fa-play"></i>
-        </button>
-        <span>Theme: ${drop.theme}</span>
-      </div>
+      ${drop.type === 'link' ? 
+        `<div class="link-preview">
+          <i class="fa-solid fa-external-link"></i>
+          <a href="${drop.audioData}" target="_blank" rel="noopener">Open Audio Link</a>
+        </div>` : 
+        `<div class="waveform">🎵 Audio Waveform</div>
+         <div class="drop-controls">
+           <button class="play-btn" onclick="playAudio('${drop.id}')">
+             <i class="fa-solid fa-play"></i>
+           </button>
+           <span>Theme: ${drop.theme}</span>
+         </div>`
+      }
       ${drop.context ? `<div class="drop-context">"${drop.context}"</div>` : ''}
       <div class="drop-actions">
         <button class="discuss-btn" onclick="openDiscussion('${drop.id}')">
@@ -694,6 +700,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('drop-sound-btn').addEventListener('click', showRecordingSection);
   document.getElementById('record-btn').addEventListener('click', startRecording);
   document.getElementById('stop-btn').addEventListener('click', stopRecording);
+  document.getElementById('link-btn').addEventListener('click', showLinkModal);
   
   // Filter buttons
   document.querySelectorAll('.filter-tag').forEach(btn => {
@@ -714,6 +721,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   
+  // Link form submission
+  document.getElementById('link-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const link = document.getElementById('audio-link').value;
+    const context = document.getElementById('link-context').value;
+    
+    if (isValidAudioLink(link)) {
+      await saveLinkDrop(link, context);
+      closeLinkModal();
+    } else {
+      alert('Please enter a valid audio link from YouTube, Spotify, SoundCloud, Bandcamp, or Freesound.org');
+    }
+  });
+  
   // Refresh data every 30 seconds to show new drops from other users
   setInterval(async () => {
     const freshData = await getSoundDrops();
@@ -721,3 +742,114 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateStatsFromData(freshData);
   }, 30 * 1000);
 });
+
+// Show link modal
+function showLinkModal() {
+  document.getElementById('link-modal').style.display = 'flex';
+}
+
+// Close link modal
+function closeLinkModal() {
+  document.getElementById('link-modal').style.display = 'none';
+  document.getElementById('audio-link').value = '';
+  document.getElementById('link-context').value = '';
+}
+
+// Validate audio links
+function isValidAudioLink(url) {
+  const validDomains = [
+    'youtube.com', 'youtu.be', 'music.youtube.com',
+    'spotify.com', 'open.spotify.com',
+    'soundcloud.com',
+    'bandcamp.com',
+    'freesound.org'
+  ];
+  
+  try {
+    const urlObj = new URL(url);
+    return validDomains.some(domain => urlObj.hostname.includes(domain));
+  } catch {
+    return false;
+  }
+}
+
+// Save link drop
+async function saveLinkDrop(link, context) {
+  try {
+    const dropData = {
+      audioData: link, // Store the link as audioData
+      context: context || '',
+      type: 'link',
+      filename: `link_${Date.now()}`
+    };
+    
+    const response = await fetch('/api/sound-drops', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(dropData)
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      console.log('Link drop saved successfully:', result);
+      
+      // Add to localStorage backup immediately
+      const backup = getLocalBackup();
+      backup.unshift(result.drop);
+      localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
+      
+      const freshData = await getSoundDrops();
+      renderSoundDropsFromData(freshData);
+      updateStatsFromData(freshData);
+    } else {
+      const errorText = await response.text();
+      console.error('Failed to save link drop:', response.status, errorText);
+      
+      // Fallback: save to localStorage only
+      console.log('Saving to localStorage as fallback');
+      const drop = {
+        id: Date.now(),
+        timestamp: Date.now(),
+        theme: getTodaysTheme().title,
+        audioData: link,
+        context: context || '',
+        type: 'link',
+        filename: `link_${Date.now()}`,
+        discussions: []
+      };
+      
+      const backup = getLocalBackup();
+      backup.unshift(drop);
+      localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
+      
+      const freshData = getLocalBackup();
+      renderSoundDropsFromData(freshData);
+      updateStatsFromData(freshData);
+    }
+  } catch (error) {
+    console.error('Error saving link drop:', error);
+    
+    // Network error fallback: save to localStorage only
+    console.log('Network error - saving to localStorage as fallback');
+    const drop = {
+      id: Date.now(),
+      timestamp: Date.now(),
+      theme: getTodaysTheme().title,
+      audioData: link,
+      context: context || '',
+      type: 'link',
+      filename: `link_${Date.now()}`,
+      discussions: []
+    };
+    
+    const backup = getLocalBackup();
+    backup.unshift(drop);
+    localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
+    
+    const freshData = getLocalBackup();
+    renderSoundDropsFromData(freshData);
+    updateStatsFromData(freshData);
+  }
+}

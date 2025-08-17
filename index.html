@@ -56,6 +56,9 @@
       <button class="upload-btn" onclick="document.getElementById('file-upload').click()">
         <i class="fa-solid fa-upload"></i> Upload Your Sound
       </button>
+      <button class="link-btn" id="link-btn">
+        <i class="fa-solid fa-link"></i> Share Audio Link
+      </button>
     </div>
 
     <div class="recording-section" id="recording-section" style="display: none;">
@@ -106,6 +109,26 @@
         <input type="file" id="audio-file" accept="audio/*" required>
         <textarea id="upload-context" placeholder="How does this sound relate to today's theme?"></textarea>
         <button type="submit">Drop Sound</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="link-modal" style="display: none;">
+    <div class="modal-content">
+      <span class="close" onclick="closeLinkModal()">&times;</span>
+      <h3>Share Audio Link for Today's Theme</h3>
+      <form id="link-form">
+        <div class="link-input-group">
+          <label for="audio-link">Audio Link:</label>
+          <input type="url" id="audio-link" placeholder="https://youtube.com/watch?v=... or https://open.spotify.com/..." required>
+          <div class="supported-platforms">
+            <small>Supported: YouTube, Spotify, SoundCloud, Bandcamp, Freesound.org</small>
+          </div>
+        </div>
+        <textarea id="link-context" placeholder="How does this sound relate to today's theme?" rows="3"></textarea>
+        <button type="submit">
+          <i class="fa-solid fa-share"></i> Share Link
+        </button>
       </form>
     </div>
   </div>
