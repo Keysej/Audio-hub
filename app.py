@@ -376,6 +376,61 @@ def add_discussion(drop_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/sound-drops/<int:drop_id>/discussion/<int:comment_id>', methods=['PUT'])
+def edit_comment(drop_id, comment_id):
+    try:
+        data = request.get_json()
+        if not data or 'text' not in data:
+            return jsonify({'error': 'No comment text provided'}), 400
+        
+        drops = load_sound_drops()
+        drop_index = next((i for i, d in enumerate(drops) if d['id'] == drop_id), None)
+        if drop_index is None:
+            return jsonify({'error': 'Sound drop not found'}), 404
+        
+        comment_index = next((i for i, c in enumerate(drops[drop_index]['discussions']) if c['id'] == comment_id), None)
+        if comment_index is None:
+            return jsonify({'error': 'Comment not found'}), 404
+        
+        # Update comment
+        drops[drop_index]['discussions'][comment_index]['text'] = data['text']
+        drops[drop_index]['discussions'][comment_index]['edited'] = True
+        drops[drop_index]['discussions'][comment_index]['editedAt'] = int(datetime.datetime.now().timestamp() * 1000)
+        
+        if save_sound_drops(drops):
+            return jsonify({
+                'message': 'Comment updated successfully!',
+                'comment': drops[drop_index]['discussions'][comment_index]
+            })
+        else:
+            return jsonify({'error': 'Failed to update comment'}), 500
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sound-drops/<int:drop_id>/discussion/<int:comment_id>', methods=['DELETE'])
+def delete_comment(drop_id, comment_id):
+    try:
+        drops = load_sound_drops()
+        drop_index = next((i for i, d in enumerate(drops) if d['id'] == drop_id), None)
+        if drop_index is None:
+            return jsonify({'error': 'Sound drop not found'}), 404
+        
+        comment_index = next((i for i, c in enumerate(drops[drop_index]['discussions']) if c['id'] == comment_id), None)
+        if comment_index is None:
+            return jsonify({'error': 'Comment not found'}), 404
+        
+        # Remove comment
+        drops[drop_index]['discussions'].pop(comment_index)
+        
+        if save_sound_drops(drops):
+            return jsonify({'message': 'Comment deleted successfully!'})
+        else:
+            return jsonify({'error': 'Failed to delete comment'}), 500
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/upload-audio', methods=['POST'])
 def upload_audio():
     try:

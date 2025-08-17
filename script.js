@@ -762,12 +762,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   
-  // Refresh data every 30 seconds to show new drops from other users
+  // Refresh data every 10 seconds to show new drops and comments from other users in real-time
   setInterval(async () => {
-    const freshData = await getSoundDrops();
-    renderSoundDropsFromData(freshData);
-    updateStatsFromData(freshData);
-  }, 30 * 1000);
+    try {
+      console.log('Auto-refreshing data for real-time collaboration...');
+      const freshData = await getSoundDrops();
+      await renderSoundDropsFromData(freshData);
+      await updateStatsFromData(freshData);
+      
+      // If a discussion modal is open, refresh its comments too
+      const modal = document.querySelector('.discussion-modal-content');
+      if (modal) {
+        const dropIdMatch = modal.innerHTML.match(/comments-list-(\d+)/);
+        if (dropIdMatch) {
+          const dropId = dropIdMatch[1];
+          const drop = freshData.find(d => d.id == dropId);
+          if (drop) {
+            const commentsList = document.getElementById(`comments-list-${dropId}`);
+            if (commentsList) {
+              commentsList.innerHTML = renderComments(drop.discussions);
+            }
+            
+            // Update comment count in header
+            const header = modal.querySelector('h4');
+            if (header) {
+              header.textContent = `Comments (${drop.discussions.length})`;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.log('Auto-refresh failed:', error);
+    }
+  }, 10 * 1000);
 });
 
 // Show link modal
@@ -904,13 +931,11 @@ async function saveCommentEdit(commentId) {
     // Find the drop containing this comment
     const drops = await getSoundDrops();
     let targetDrop = null;
-    let commentIndex = -1;
     
     for (let drop of drops) {
-      const index = drop.discussions.findIndex(c => c.id == commentId);
-      if (index !== -1) {
+      const comment = drop.discussions.find(c => c.id == commentId);
+      if (comment) {
         targetDrop = drop;
-        commentIndex = index;
         break;
       }
     }
@@ -920,12 +945,39 @@ async function saveCommentEdit(commentId) {
       return;
     }
     
-    // Update comment in the data
-    targetDrop.discussions[commentIndex].text = newText;
-    targetDrop.discussions[commentIndex].edited = true;
-    targetDrop.discussions[commentIndex].editedAt = Date.now();
+    // Try to update via API first
+    try {
+      const response = await fetch(`/api/sound-drops/${targetDrop.id}/discussion/${commentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ text: newText })
+      });
+      
+      if (response.ok) {
+        // API success - refresh data and UI
+        const freshData = await getSoundDrops();
+        await renderSoundDropsFromData(freshData);
+        await updateStatsFromData(freshData);
+        
+        // Close edit mode
+        document.getElementById(`comment-text-${commentId}`).style.display = 'block';
+        document.getElementById(`comment-edit-${commentId}`).style.display = 'none';
+        
+        console.log('Comment updated successfully via API');
+        return;
+      }
+    } catch (apiError) {
+      console.log('API edit failed, using localStorage fallback');
+    }
     
-    // Save to localStorage
+    // Fallback to localStorage if API fails
+    const comment = targetDrop.discussions.find(c => c.id == commentId);
+    comment.text = newText;
+    comment.edited = true;
+    comment.editedAt = Date.now();
+    
     await updateCommentInStorage(targetDrop);
     
     // Update the display
@@ -954,13 +1006,11 @@ async function deleteComment(commentId) {
     // Find the drop containing this comment
     const drops = await getSoundDrops();
     let targetDrop = null;
-    let commentIndex = -1;
     
     for (let drop of drops) {
-      const index = drop.discussions.findIndex(c => c.id == commentId);
-      if (index !== -1) {
+      const comment = drop.discussions.find(c => c.id == commentId);
+      if (comment) {
         targetDrop = drop;
-        commentIndex = index;
         break;
       }
     }
@@ -970,25 +1020,54 @@ async function deleteComment(commentId) {
       return;
     }
     
-    // Remove comment from the data
-    targetDrop.discussions.splice(commentIndex, 1);
-    
-    // Save to localStorage
-    await updateCommentInStorage(targetDrop);
-    
-    // Remove from display
-    document.getElementById(`comment-${commentId}`).remove();
-    
-    // Update discussion count in modal header
-    const modalHeader = document.querySelector('.discussion-modal-content h4');
-    if (modalHeader) {
-      modalHeader.textContent = `Comments (${targetDrop.discussions.length})`;
+    // Try to delete via API first
+    try {
+      const response = await fetch(`/api/sound-drops/${targetDrop.id}/discussion/${commentId}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        // API success - refresh data and UI
+        const freshData = await getSoundDrops();
+        await renderSoundDropsFromData(freshData);
+        await updateStatsFromData(freshData);
+        
+        // Update discussion count in modal header if open
+        const modalHeader = document.querySelector('.discussion-modal-content h4');
+        if (modalHeader) {
+          const updatedDrop = freshData.find(d => d.id === targetDrop.id);
+          if (updatedDrop) {
+            modalHeader.textContent = `Comments (${updatedDrop.discussions.length})`;
+          }
+        }
+        
+        console.log('Comment deleted successfully via API');
+        return;
+      }
+    } catch (apiError) {
+      console.log('API delete failed, using localStorage fallback');
     }
     
-    // Update the main page
-    const freshData = await getSoundDrops();
-    renderSoundDropsFromData(freshData);
-    updateStatsFromData(freshData);
+    // Fallback to localStorage if API fails
+    const commentIndex = targetDrop.discussions.findIndex(c => c.id == commentId);
+    if (commentIndex !== -1) {
+      targetDrop.discussions.splice(commentIndex, 1);
+      await updateCommentInStorage(targetDrop);
+      
+      // Remove from display
+      document.getElementById(`comment-${commentId}`).remove();
+      
+      // Update discussion count in modal header
+      const modalHeader = document.querySelector('.discussion-modal-content h4');
+      if (modalHeader) {
+        modalHeader.textContent = `Comments (${targetDrop.discussions.length})`;
+      }
+      
+      // Update the main page
+      const freshData = await getSoundDrops();
+      renderSoundDropsFromData(freshData);
+      updateStatsFromData(freshData);
+    }
     
   } catch (error) {
     console.error('Error deleting comment:', error);
