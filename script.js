@@ -232,11 +232,11 @@ function renderSoundDropsFromData(drops, filter = 'all') {
           <a href="${drop.audioData}" target="_blank" rel="noopener">Open Audio Link</a>
         </div>` : 
         `<div class="waveform">🎵 Audio Waveform</div>
-         <div class="drop-controls">
-           <button class="play-btn" onclick="playAudio('${drop.id}')">
-             <i class="fa-solid fa-play"></i>
-           </button>
-           <span>Theme: ${drop.theme}</span>
+      <div class="drop-controls">
+        <button class="play-btn" onclick="playAudio('${drop.id}')">
+          <i class="fa-solid fa-play"></i>
+        </button>
+        <span>Theme: ${drop.theme}</span>
          </div>`
       }
       ${drop.context ? `<div class="drop-context">"${drop.context}"</div>` : ''}
@@ -606,6 +606,9 @@ async function addComment(dropId) {
   
     if (response.ok) {
       const result = await response.json();
+      
+      // Show success message
+      showNotification('Comment added successfully!', 'success');
   
       // Get updated drops to refresh display
       const drops = await getSoundDrops();
@@ -956,6 +959,9 @@ async function saveCommentEdit(commentId) {
       });
       
       if (response.ok) {
+        // Show success message
+        showNotification('Comment updated successfully!', 'success');
+        
         // API success - refresh data and UI
         const freshData = await getSoundDrops();
         await renderSoundDropsFromData(freshData);
@@ -1027,7 +1033,16 @@ async function deleteComment(commentId) {
       });
       
       if (response.ok) {
-        // API success - refresh data and UI
+        // API success - remove from display immediately
+        const commentElement = document.getElementById(`comment-${commentId}`);
+        if (commentElement) {
+          commentElement.remove();
+        }
+        
+        // Show success message
+        showNotification('Comment deleted successfully!', 'success');
+        
+        // Refresh data and UI
         const freshData = await getSoundDrops();
         await renderSoundDropsFromData(freshData);
         await updateStatsFromData(freshData);
@@ -1054,8 +1069,14 @@ async function deleteComment(commentId) {
       targetDrop.discussions.splice(commentIndex, 1);
       await updateCommentInStorage(targetDrop);
       
-      // Remove from display
-      document.getElementById(`comment-${commentId}`).remove();
+      // Remove from display immediately
+      const commentElement = document.getElementById(`comment-${commentId}`);
+      if (commentElement) {
+        commentElement.remove();
+      }
+      
+      // Show success message
+      showNotification('Comment deleted successfully!', 'success');
       
       // Update discussion count in modal header
       const modalHeader = document.querySelector('.discussion-modal-content h4');
@@ -1104,4 +1125,34 @@ function showWelcomeMessage() {
   // Insert before the sound drops container
   const soundDropsContainer = document.getElementById('sound-drops');
   soundDropsContainer.parentNode.insertBefore(welcomeDiv, soundDropsContainer);
+}
+
+// Show notification message
+function showNotification(message, type = 'info') {
+  // Remove any existing notifications
+  const existingNotification = document.querySelector('.notification');
+  if (existingNotification) {
+    existingNotification.remove();
+  }
+  
+  const notification = document.createElement('div');
+  notification.className = `notification notification-${type}`;
+  notification.innerHTML = `
+    <div class="notification-content">
+      <span class="notification-message">${message}</span>
+      <button class="notification-close" onclick="this.parentElement.parentElement.remove()">
+        <i class="fa-solid fa-times"></i>
+      </button>
+    </div>
+  `;
+  
+  // Add to the top of the page
+  document.body.insertBefore(notification, document.body.firstChild);
+  
+  // Auto-remove after 3 seconds
+  setTimeout(() => {
+    if (notification && notification.parentNode) {
+      notification.remove();
+    }
+  }, 3000);
 }
