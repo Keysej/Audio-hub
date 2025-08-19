@@ -48,17 +48,7 @@ function getTodaysTheme() {
 async function getSoundDrops() {
   try {
     console.log('Fetching sound drops from API...');
-    const response = await fetch('/api/sound-drops', {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      // Mobile-friendly options
-      cache: 'no-cache',
-      mode: 'same-origin',
-      credentials: 'same-origin'
-    });
+    const response = await fetch('/api/sound-drops');
     console.log('API response status:', response.status);
     
     if (response.ok) {
@@ -77,12 +67,10 @@ async function getSoundDrops() {
     } else {
       const errorText = await response.text();
       console.error('Failed to fetch sound drops:', response.status, errorText);
-      console.log('Using localStorage fallback due to API error');
       return getLocalBackup();
     }
   } catch (error) {
-    console.error('Error fetching sound drops (likely network issue on mobile):', error);
-    console.log('Using localStorage fallback due to network error');
+    console.error('Error fetching sound drops:', error);
     return getLocalBackup();
   }
 }
@@ -608,17 +596,12 @@ async function addComment(dropId) {
     const response = await fetch(`/api/sound-drops/${dropId}/discussion`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        text: commentText,
+    text: commentText,
         author: 'Researcher'
-      }),
-      // Mobile-friendly fetch options
-      cache: 'no-cache',
-      mode: 'same-origin',
-      credentials: 'same-origin'
+      })
     });
   
     if (response.ok) {
@@ -654,100 +637,12 @@ async function addComment(dropId) {
       updateStatsFromData(freshData);
       
     } else {
-      console.error('Failed to add comment - API response not OK:', response.status);
-      
-      // Try localStorage fallback for mobile
-      console.log('API failed, using localStorage fallback for mobile');
-      const drops = getLocalBackup();
-      const drop = drops.find(d => d.id == dropId);
-      
-      if (drop) {
-        const comment = {
-          id: Date.now(),
-          text: commentText,
-          timestamp: Date.now(),
-          author: 'Researcher'
-        };
-        
-        drop.discussions.push(comment);
-        localStorage.setItem('soundDropsBackup', JSON.stringify(drops));
-        
-        // Show success message
-        showNotification('Comment added successfully! (Saved locally)', 'success');
-        
-        // Clear the textarea
-        textarea.value = '';
-        
-        // Re-render with updated data
-        await renderSoundDropsFromData(drops);
-        await updateStatsFromData(drops);
-        
-        // Update the discussion modal if it's open
-        const modal = document.querySelector('.discussion-modal-content');
-        if (modal) {
-          const discussionsHtml = renderComments(drop.discussions);
-          const discussionsContainer = modal.querySelector('.discussions');
-          if (discussionsContainer) {
-            discussionsContainer.innerHTML = discussionsHtml;
-          }
-          
-          // Update comment count in header
-          const header = modal.querySelector('h4');
-          if (header) {
-            header.textContent = `Comments (${drop.discussions.length})`;
-          }
-        }
-      } else {
-        alert('Failed to add comment. Please try again.');
-      }
+      console.error('Failed to add comment');
+      alert('Failed to add comment. Please try again.');
     }
   } catch (error) {
     console.error('Error adding comment:', error);
-    
-    // Fallback to localStorage for mobile compatibility
-    console.log('Using localStorage fallback for mobile comment');
-    const drops = getLocalBackup();
-    const drop = drops.find(d => d.id == dropId);
-    
-    if (drop) {
-      const comment = {
-        id: Date.now(),
-        text: commentText,
-        timestamp: Date.now(),
-        author: 'Researcher'
-      };
-      
-      drop.discussions.push(comment);
-      localStorage.setItem('soundDropsBackup', JSON.stringify(drops));
-      
-      // Show success message
-      showNotification('Comment added successfully! (Saved locally)', 'success');
-      
-      // Clear the textarea
-      textarea.value = '';
-      
-      // Re-render with updated data
-      await renderSoundDropsFromData(drops);
-      await updateStatsFromData(drops);
-      
-      // Update the discussion modal if it's open
-      const modal = document.querySelector('.discussion-modal-content');
-      if (modal) {
-        const discussionsHtml = renderComments(drop.discussions);
-        const discussionsContainer = modal.querySelector('.discussions');
-        if (discussionsContainer) {
-          discussionsContainer.innerHTML = discussionsHtml;
-        }
-        
-        // Update comment count in header
-        const header = modal.querySelector('h4');
-        if (header) {
-          header.textContent = `Comments (${drop.discussions.length})`;
-        }
-      }
-    } else {
-      alert('Error adding comment. Please try again.');
-    }
+    alert('Error adding comment. Please try again.');
   }
 }
 
@@ -757,14 +652,10 @@ function checkDeviceCapabilities() {
     mediaRecorder: typeof MediaRecorder !== 'undefined',
     getUserMedia: navigator.mediaDevices && navigator.mediaDevices.getUserMedia,
     audioContext: typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined',
-    localStorage: typeof Storage !== 'undefined',
-    fetch: typeof fetch !== 'undefined',
-    mobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    localStorage: typeof Storage !== 'undefined'
   };
   
   console.log('Device capabilities:', capabilities);
-  console.log('User agent:', navigator.userAgent);
-  console.log('Connection type:', navigator.connection ? navigator.connection.effectiveType : 'unknown');
   
   // Show warning if critical features are missing
   if (!capabilities.mediaRecorder || !capabilities.getUserMedia) {
@@ -784,30 +675,6 @@ function checkDeviceCapabilities() {
       You can still listen to others' recordings and participate in discussions.
     `;
     document.querySelector('.container').insertBefore(warningDiv, document.querySelector('.theme-section'));
-  }
-  
-  // Mobile-specific debugging
-  if (capabilities.mobile) {
-    console.log('Mobile device detected - enabling enhanced error logging');
-    
-    // Test API connectivity
-    setTimeout(async () => {
-      try {
-        const testResponse = await fetch('/api/status', {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' },
-          cache: 'no-cache'
-        });
-        console.log('Mobile API test - Status:', testResponse.status);
-        if (testResponse.ok) {
-          const statusData = await testResponse.json();
-          console.log('Mobile API test - Data:', statusData);
-        }
-      } catch (error) {
-        console.error('Mobile API test failed:', error);
-        showNotification('Network connectivity issue detected. Comments will be saved locally.', 'info');
-      }
-    }, 2000);
   }
   
   return capabilities;

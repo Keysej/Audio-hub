@@ -170,7 +170,7 @@ body {
 }
 
 .link-btn {
-  background: linear-gradient(135deg, #9b59b6, #8e44ad);
+  background: linear-gradient(135deg, #3498db, #2980b9);
 }
 
 .drop-sound-btn:hover, .upload-btn:hover {
@@ -180,7 +180,7 @@ body {
 
 .link-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(155, 89, 182, 0.3);
+  box-shadow: 0 8px 25px rgba(52, 152, 219, 0.3);
 }
 
 .recording-section {
@@ -393,7 +393,7 @@ body {
 }
 
 .link-preview {
-  background: linear-gradient(135deg, #9b59b6, #8e44ad);
+  background: linear-gradient(135deg, #3498db, #2980b9);
   color: white;
   padding: 15px 20px;
   border-radius: 10px;
@@ -406,7 +406,7 @@ body {
 
 .link-preview:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(155, 89, 182, 0.3);
+  box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
 }
 
 .link-preview a {
