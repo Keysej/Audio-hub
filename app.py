@@ -4,11 +4,58 @@ import base64
 import os
 import json
 import tempfile
+from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure, OperationFailure
 
 app = Flask(__name__)
 
 # File-based storage for Vercel serverless environment
 STORAGE_FILE = '/tmp/sound_drops.json'
+
+# MongoDB Configuration for Research Data Archive
+# Replace with your actual MongoDB password
+MONGODB_URI = "mongodb+srv://jimalekeyse:Singaboor12%40@sounddrop.5dkflfy.mongodb.net/"
+MONGODB_DATABASE = "sounddrop_research"
+
+# MongoDB client (will be initialized when needed)
+mongo_client = None
+research_db = None
+
+def init_mongodb():
+    """Initialize MongoDB connection for research data archiving"""
+    global mongo_client, research_db
+    try:
+        if mongo_client is None:
+            # You need to replace <db_password> with your actual password
+            mongo_client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
+            # Test the connection
+            mongo_client.admin.command('ping')
+            research_db = mongo_client[MONGODB_DATABASE]
+            print("MongoDB connection established for research archiving")
+        return True
+    except Exception as e:
+        print(f"MongoDB connection failed: {e}")
+        return False
+
+def archive_to_research_db(drop_data):
+    """Archive sound drop to MongoDB for research purposes"""
+    try:
+        if init_mongodb():
+            # Add research metadata
+            research_record = {
+                **drop_data,
+                'archived_at': datetime.datetime.now().isoformat(),
+                'research_status': 'active',
+                'study_phase': 'diary_study_2024'
+            }
+            
+            # Insert into research archive
+            result = research_db.sound_drops_archive.insert_one(research_record)
+            print(f"Archived drop {drop_data['id']} to research database: {result.inserted_id}")
+            return True
+    except Exception as e:
+        print(f"Failed to archive to research database: {e}")
+    return False
 
 def load_sound_drops():
     """Load sound drops from file storage"""
@@ -16,8 +63,16 @@ def load_sound_drops():
         if os.path.exists(STORAGE_FILE):
             with open(STORAGE_FILE, 'r') as f:
                 data = json.load(f)
-                # Clean old drops (24 hours)
+                
+                # Archive old drops to research database before filtering
                 now = datetime.datetime.now().timestamp() * 1000
+                expired_drops = [drop for drop in data if (now - drop['timestamp']) >= 24 * 60 * 60 * 1000]
+                
+                # Archive expired drops for research
+                for drop in expired_drops:
+                    archive_to_research_db(drop)
+                
+                # Return only valid (non-expired) drops for user interface
                 valid_drops = [drop for drop in data if (now - drop['timestamp']) < 24 * 60 * 60 * 1000]
                 return valid_drops
         return []
@@ -258,6 +313,72 @@ def api_status():
             'status': 'error',
             'error': str(e),
             'timestamp': datetime.datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/research/status')
+def research_status():
+    """Research endpoint to check archived data status"""
+    try:
+        if init_mongodb():
+            # Count archived drops
+            archived_count = research_db.sound_drops_archive.count_documents({})
+            
+            # Get recent archive activity
+            recent_archives = list(research_db.sound_drops_archive.find(
+                {}, 
+                {'id': 1, 'archived_at': 1, 'theme': 1, 'type': 1}
+            ).sort('archived_at', -1).limit(5))
+            
+            return jsonify({
+                'status': 'connected',
+                'archived_drops_count': archived_count,
+                'recent_archives': recent_archives,
+                'database': MONGODB_DATABASE,
+                'timestamp': datetime.datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                'status': 'mongodb_connection_failed',
+                'message': 'Could not connect to research database',
+                'timestamp': datetime.datetime.now().isoformat()
+            }), 500
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/research/export')
+def export_research_data():
+    """Export archived research data (for analysis)"""
+    try:
+        if init_mongodb():
+            # Get all archived data
+            archived_data = list(research_db.sound_drops_archive.find(
+                {},
+                {'audioData': 0}  # Exclude large audio data from export, keep metadata
+            ).sort('archived_at', -1))
+            
+            # Convert ObjectId to string for JSON serialization
+            for item in archived_data:
+                item['_id'] = str(item['_id'])
+            
+            return jsonify({
+                'status': 'success',
+                'data_count': len(archived_data),
+                'archived_drops': archived_data,
+                'export_timestamp': datetime.datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                'status': 'mongodb_connection_failed',
+                'message': 'Could not connect to research database'
+            }), 500
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
         }), 500
 
 # Helper function to get current theme
