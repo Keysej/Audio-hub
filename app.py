@@ -4,10 +4,24 @@ import base64
 import os
 import json
 import tempfile
+import csv
+import io
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure, OperationFailure
 
 app = Flask(__name__)
+
+# Add datetime filter for templates
+@app.template_filter('datetime')
+def datetime_filter(timestamp, format='%Y-%m-%d %H:%M'):
+    """Convert timestamp to formatted datetime string"""
+    try:
+        if isinstance(timestamp, str):
+            return timestamp
+        dt = datetime.datetime.fromtimestamp(timestamp)
+        return dt.strftime(format)
+    except:
+        return 'Unknown'
 
 # File-based storage for Vercel serverless environment
 STORAGE_FILE = '/tmp/sound_drops.json'
@@ -293,9 +307,412 @@ JOURNAL_TEMPLATE = """
 </html>
 """
 
+# Admin Login Template
+ADMIN_LOGIN_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoundDrop Research Admin</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        h1 { color: #2c3e50; margin-bottom: 30px; }
+        .login-form { margin-top: 20px; }
+        input[type="password"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 10px;
+            font-size: 16px;
+            margin: 10px 0;
+            box-sizing: border-box;
+        }
+        .login-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            width: 100%;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>🔬 SoundDrop Research Admin</h1>
+        <p>Access research data and analytics</p>
+        <form class="login-form" onsubmit="handleLogin(event)">
+            <input type="password" id="password" placeholder="Enter admin password" required>
+            <button type="submit" class="login-btn">Access Dashboard</button>
+        </form>
+    </div>
+    
+    <script>
+        function handleLogin(event) {
+            event.preventDefault();
+            const password = document.getElementById('password').value;
+            window.location.href = `/admin/dashboard?key=${password}`;
+        }
+    </script>
+</body>
+</html>
+"""
+
+# Admin Dashboard Template
+ADMIN_DASHBOARD_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoundDrop Research Dashboard</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f8f9fa;
+            margin: 0;
+            padding: 20px;
+            color: #2c3e50;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .section {
+            background: white;
+            margin-bottom: 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .section-header {
+            background: #667eea;
+            color: white;
+            padding: 20px;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+        .drop-item {
+            padding: 20px;
+            border-bottom: 1px solid #e1e8ed;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 20px;
+        }
+        .drop-info h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        .drop-meta {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin: 5px 0;
+        }
+        .drop-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .play-btn {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .play-btn:hover {
+            background: #ee5a24;
+        }
+        .comments {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-top: 15px;
+            border-radius: 10px;
+        }
+        .comment {
+            background: white;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+        }
+        .export-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 10px;
+        }
+        .export-btn:hover {
+            background: #218838;
+        }
+        .no-data {
+            padding: 40px;
+            text-align: center;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔬 SoundDrop Research Dashboard</h1>
+        <p>Comprehensive view of all research data</p>
+    </div>
+    
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-number">{{ total_count }}</div>
+            <div>Total Sound Drops</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ current_drops|length }}</div>
+            <div>Current Active</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ archived_drops|length }}</div>
+            <div>Archived</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">
+                {% set total_comments = 0 %}
+                {% for drop in current_drops %}
+                    {% set total_comments = total_comments + (drop.discussions|length) %}
+                {% endfor %}
+                {% for drop in archived_drops %}
+                    {% set total_comments = total_comments + (drop.discussions|length) %}
+                {% endfor %}
+                {{ total_comments }}
+            </div>
+            <div>Total Comments</div>
+        </div>
+    </div>
+    
+    <div style="text-align: center; margin-bottom: 20px;">
+        <button class="export-btn" onclick="exportData('json')">Export as JSON</button>
+        <button class="export-btn" onclick="exportData('csv')">Export as CSV</button>
+    </div>
+    
+    {% if current_drops %}
+    <div class="section">
+        <div class="section-header">🔴 Current Active Drops</div>
+        {% for drop in current_drops %}
+        <div class="drop-item">
+            <div class="drop-info">
+                <h3>{{ drop.theme or 'No Theme' }}</h3>
+                <div class="drop-meta">
+                    📅 {{ (drop.timestamp/1000)|int|datetime('%Y-%m-%d %H:%M') }} | 
+                    🎵 {{ drop.type|title }} | 
+                    📄 {{ drop.filename or 'No filename' }}
+                </div>
+                {% if drop.context %}
+                <div class="drop-meta">💭 {{ drop.context }}</div>
+                {% endif %}
+                
+                {% if drop.discussions %}
+                <div class="comments">
+                    <strong>💬 Comments ({{ drop.discussions|length }}):</strong>
+                    {% for comment in drop.discussions %}
+                    <div class="comment">
+                        <strong>{{ comment.author or 'User' }}:</strong> {{ comment.text }}
+                        <br><small>{{ (comment.timestamp/1000)|int|datetime('%Y-%m-%d %H:%M') }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            <div class="drop-actions">
+                {% if drop.audioData %}
+                <button class="play-btn" onclick="playAudio('{{ drop.audioData }}', this)">▶️ Play</button>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    {% if archived_drops %}
+    <div class="section">
+        <div class="section-header">📦 Archived Drops (Research Data)</div>
+        {% for drop in archived_drops %}
+        <div class="drop-item">
+            <div class="drop-info">
+                <h3>{{ drop.theme or 'No Theme' }}</h3>
+                <div class="drop-meta">
+                    📅 {{ drop.archived_at[:19] if drop.archived_at else 'Unknown' }} | 
+                    🎵 {{ drop.type|title }} | 
+                    📄 {{ drop.filename or 'No filename' }}
+                </div>
+                {% if drop.context %}
+                <div class="drop-meta">💭 {{ drop.context }}</div>
+                {% endif %}
+                
+                {% if drop.discussions %}
+                <div class="comments">
+                    <strong>💬 Comments ({{ drop.discussions|length }}):</strong>
+                    {% for comment in drop.discussions %}
+                    <div class="comment">
+                        <strong>{{ comment.author or 'User' }}:</strong> {{ comment.text }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            <div class="drop-actions">
+                {% if drop.audioData %}
+                <button class="play-btn" onclick="playAudio('{{ drop.audioData }}', this)">▶️ Play</button>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    {% if not current_drops and not archived_drops %}
+    <div class="section">
+        <div class="no-data">
+            <h3>No research data available yet</h3>
+            <p>Data will appear here as users interact with SoundDrop</p>
+        </div>
+    </div>
+    {% endif %}
+    
+    <script>
+        let currentAudio = null;
+        
+        function playAudio(audioData, button) {
+            // Stop current audio if playing
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+                // Reset all buttons
+                document.querySelectorAll('.play-btn').forEach(btn => {
+                    btn.textContent = '▶️ Play';
+                });
+            }
+            
+            // Play new audio
+            if (button.textContent === '▶️ Play') {
+                currentAudio = new Audio(audioData);
+                currentAudio.play();
+                button.textContent = '⏸️ Pause';
+                
+                currentAudio.onended = () => {
+                    button.textContent = '▶️ Play';
+                    currentAudio = null;
+                };
+            }
+        }
+        
+        function exportData(format) {
+            const url = `/api/research/export?format=${format}&key=research2024`;
+            window.open(url, '_blank');
+        }
+    </script>
+</body>
+</html>
+"""
+
 @app.route('/')
 def index():
     return render_template_string(JOURNAL_TEMPLATE)
+
+@app.route('/admin')
+def admin_login():
+    """Admin login page"""
+    return render_template_string(ADMIN_LOGIN_TEMPLATE)
+
+@app.route('/admin/dashboard')
+def admin_dashboard():
+    """Admin dashboard to view all research data"""
+    # Simple password check via URL parameter for now
+    password = request.args.get('key')
+    if password != 'research2024':
+        return "Access denied. Invalid key.", 403
+    
+    try:
+        # Get ALL data (including expired) from file storage
+        all_data = []
+        if os.path.exists(STORAGE_FILE):
+            with open(STORAGE_FILE, 'r') as f:
+                all_data = json.load(f)
+        
+        # Also try to get archived data from MongoDB if available
+        archived_data = []
+        if init_mongodb():
+            try:
+                archived_data = list(research_db.sound_drops_archive.find({}).sort('archived_at', -1))
+                # Convert ObjectId to string for template
+                for item in archived_data:
+                    item['_id'] = str(item['_id'])
+            except Exception as e:
+                print(f"Could not fetch archived data: {e}")
+        
+        # Combine all data for comprehensive view
+        total_drops = len(all_data) + len(archived_data)
+        
+        return render_template_string(ADMIN_DASHBOARD_TEMPLATE, 
+                                    current_drops=all_data,
+                                    archived_drops=archived_data,
+                                    total_count=total_drops)
+    
+    except Exception as e:
+        return f"Error loading dashboard: {str(e)}", 500
 
 @app.route('/api/status')
 def api_status():
@@ -351,30 +768,105 @@ def research_status():
 
 @app.route('/api/research/export')
 def export_research_data():
-    """Export archived research data (for analysis)"""
+    """Export research data in various formats"""
+    # Check admin access
+    if request.args.get('key') != 'research2024':
+        return "Access denied", 403
+    
+    export_format = request.args.get('format', 'json').lower()
+    
     try:
+        # Get all data (current + archived)
+        all_data = []
+        
+        # Get current data
+        if os.path.exists(STORAGE_FILE):
+            with open(STORAGE_FILE, 'r') as f:
+                current_data = json.load(f)
+                for item in current_data:
+                    item['data_source'] = 'current'
+                all_data.extend(current_data)
+        
+        # Get archived data from MongoDB
         if init_mongodb():
-            # Get all archived data
-            archived_data = list(research_db.sound_drops_archive.find(
-                {},
-                {'audioData': 0}  # Exclude large audio data from export, keep metadata
-            ).sort('archived_at', -1))
+            try:
+                archived_data = list(research_db.sound_drops_archive.find({}, {'audioData': 0}))
+                for item in archived_data:
+                    item['_id'] = str(item['_id'])
+                    item['data_source'] = 'archived'
+                all_data.extend(archived_data)
+            except Exception as e:
+                print(f"Could not fetch archived data: {e}")
+        
+        if export_format == 'csv':
+            # Create CSV export
+            output = io.StringIO()
+            if all_data:
+                # Flatten data for CSV
+                flattened_data = []
+                for drop in all_data:
+                    base_row = {
+                        'id': drop.get('id'),
+                        'timestamp': datetime_filter(drop.get('timestamp', 0) / 1000 if drop.get('timestamp') else 0),
+                        'theme': drop.get('theme', ''),
+                        'type': drop.get('type', ''),
+                        'filename': drop.get('filename', ''),
+                        'context': drop.get('context', ''),
+                        'data_source': drop.get('data_source', ''),
+                        'archived_at': drop.get('archived_at', ''),
+                        'comments_count': len(drop.get('discussions', []))
+                    }
+                    
+                    # Add each comment as a separate row
+                    if drop.get('discussions'):
+                        for i, comment in enumerate(drop.get('discussions', [])):
+                            row = base_row.copy()
+                            row.update({
+                                'comment_id': comment.get('id', ''),
+                                'comment_text': comment.get('text', ''),
+                                'comment_author': comment.get('author', ''),
+                                'comment_timestamp': datetime_filter(comment.get('timestamp', 0) / 1000 if comment.get('timestamp') else 0),
+                                'comment_number': i + 1
+                            })
+                            flattened_data.append(row)
+                    else:
+                        # Add row without comments
+                        flattened_data.append(base_row)
+                
+                if flattened_data:
+                    writer = csv.DictWriter(output, fieldnames=flattened_data[0].keys())
+                    writer.writeheader()
+                    writer.writerows(flattened_data)
             
-            # Convert ObjectId to string for JSON serialization
-            for item in archived_data:
-                item['_id'] = str(item['_id'])
-            
-            return jsonify({
-                'status': 'success',
-                'data_count': len(archived_data),
-                'archived_drops': archived_data,
-                'export_timestamp': datetime.datetime.now().isoformat()
-            })
+            response = app.response_class(
+                response=output.getvalue(),
+                status=200,
+                mimetype='text/csv'
+            )
+            response.headers['Content-Disposition'] = f'attachment; filename=sounddrop_research_data_{datetime.datetime.now().strftime("%Y%m%d_%H%M")}.csv'
+            return response
+        
         else:
-            return jsonify({
-                'status': 'mongodb_connection_failed',
-                'message': 'Could not connect to research database'
-            }), 500
+            # JSON export
+            export_data = {
+                'export_info': {
+                    'timestamp': datetime.datetime.now().isoformat(),
+                    'total_drops': len(all_data),
+                    'current_drops': len([d for d in all_data if d.get('data_source') == 'current']),
+                    'archived_drops': len([d for d in all_data if d.get('data_source') == 'archived']),
+                    'format': 'json'
+                },
+                'data': all_data
+            }
+            
+            response = app.response_class(
+                response=json.dumps(export_data, indent=2),
+                status=200,
+                mimetype='application/json'
+            )
+            response.headers['Content-Disposition'] = f'attachment; filename=sounddrop_research_data_{datetime.datetime.now().strftime("%Y%m%d_%H%M")}.json'
+            return response
+            
     except Exception as e:
         return jsonify({
             'status': 'error',
