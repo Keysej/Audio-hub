@@ -555,7 +555,7 @@ function renderComments(comments) {
   return comments.map(comment => `
     <div class="comment" id="comment-${comment.id}">
       <div class="comment-header">
-        <span class="comment-author">Researcher</span>
+        <span class="comment-author">A Group Member</span>
         <span class="comment-time">${formatTime(comment.timestamp)}</span>
         <div class="comment-actions">
           <button class="edit-comment-btn" onclick="editComment('${comment.id}')" title="Edit comment">
@@ -597,7 +597,7 @@ async function addComment(dropId) {
     id: Date.now(),
     timestamp: Date.now(),
     text: commentText,
-    author: 'Researcher'
+    author: 'A Group Member'
   };
   
   // First, add the comment locally for immediate feedback
@@ -642,7 +642,7 @@ async function addComment(dropId) {
       },
       body: JSON.stringify({
         text: commentText,
-        author: 'Researcher'
+        author: 'A Group Member'
       })
     });
   

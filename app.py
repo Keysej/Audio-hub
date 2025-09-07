@@ -972,7 +972,7 @@ def add_discussion(drop_id):
             'id': int(datetime.datetime.now().timestamp() * 1000),
             'timestamp': int(datetime.datetime.now().timestamp() * 1000),
             'text': data['text'],
-            'author': data.get('author', 'Researcher')
+            'author': data.get('author', 'A Group Member')
         }
         
         drops[drop_index]['discussions'].append(comment)
