@@ -267,9 +267,34 @@
 
     async function loadDashboardData() {
       try {
-        // Load current active data
-        const activeResponse = await fetch('/api/sound-drops');
-        const activeData = activeResponse.ok ? await activeResponse.json() : [];
+        let activeData = [];
+        
+        // First try to load from API
+        try {
+          const activeResponse = await fetch('/api/sound-drops');
+          if (activeResponse.ok) {
+            activeData = await activeResponse.json();
+            console.log('Loaded data from API:', activeData.length, 'drops');
+          }
+        } catch (e) {
+          console.log('API not available, will use localStorage');
+        }
+        
+        // If no API data, fall back to localStorage (same as main page)
+        if (activeData.length === 0) {
+          try {
+            const stored = localStorage.getItem('soundDropsBackup');
+            if (stored) {
+              const localData = JSON.parse(stored);
+              // Filter out drops older than 24 hours (same logic as main page)
+              const now = Date.now();
+              activeData = localData.filter(drop => (now - drop.timestamp) < 24 * 60 * 60 * 1000);
+              console.log('Loaded data from localStorage:', activeData.length, 'drops');
+            }
+          } catch (e) {
+            console.error('Error reading localStorage:', e);
+          }
+        }
         
         // Try to load archived data from research endpoint
         let archivedData = [];
@@ -308,6 +333,18 @@
     function displayData(activeData, archivedData) {
       const dataDisplay = document.getElementById('data-display');
       let html = '';
+
+      // Data source indicator
+      const dataSource = activeData.length > 0 ? 
+        (activeData[0].id ? 'localStorage' : 'API') : 'none';
+      
+      html += `
+        <div style="background: #e8f4fd; padding: 10px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9em;">
+          📊 Data Source: ${dataSource === 'localStorage' ? '💾 Local Storage (Browser)' : 
+                            dataSource === 'API' ? '🌐 API Server' : '❌ No Data'}
+          ${dataSource === 'localStorage' ? '<br><small>💡 Data is from your browser storage. API sync may not be working.</small>' : ''}
+        </div>
+      `;
 
       // Active Data Section
       if (activeData.length > 0) {
