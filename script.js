@@ -592,60 +592,72 @@ async function addComment(dropId) {
     return;
   }
   
+  // Create the comment object
+  const comment = {
+    id: Date.now(),
+    timestamp: Date.now(),
+    text: commentText,
+    author: 'Researcher'
+  };
+  
+  // First, add the comment locally for immediate feedback
+  const localDrops = getLocalBackup();
+  const localDropIndex = localDrops.findIndex(d => d.id == dropId);
+  
+  if (localDropIndex !== -1) {
+    localDrops[localDropIndex].discussions.push(comment);
+    localStorage.setItem('soundDropsBackup', JSON.stringify(localDrops));
+  
+    // Update the UI immediately
+  const commentsList = document.getElementById(`comments-list-${dropId}`);
+  if (commentsList) {
+      commentsList.innerHTML = renderComments(localDrops[localDropIndex].discussions);
+  }
+  
+  // Update the discussion count in the modal header
+  const modalHeader = document.querySelector('.discussion-modal-content h4');
+  if (modalHeader) {
+      modalHeader.textContent = `Comments (${localDrops[localDropIndex].discussions.length})`;
+  }
+  
+  // Clear the textarea
+  textarea.value = '';
+  
+    // Show success message
+    showNotification('Comment added successfully!', 'success');
+    
+    // Update the main page display
+    renderSoundDropsFromData(localDrops);
+    updateStatsFromData(localDrops);
+  }
+  
+  // Try to sync with API in the background (don't block the UI)
   try {
     const apiUrl = `/api/sound-drops/${dropId}/discussion`;
-    console.log('Making comment API call to:', apiUrl);
+    console.log('Attempting to sync comment with API:', apiUrl);
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-    text: commentText,
+        text: commentText,
         author: 'Researcher'
       })
     });
   
     if (response.ok) {
-      const result = await response.json();
-      
-      // Show success message
-      showNotification('Comment added successfully!', 'success');
-  
-      // Get updated drops to refresh display
-      const drops = await getSoundDrops();
-      const drop = drops.find(d => d.id == dropId);
-  
-      if (drop) {
-  // Update the comments display
-  const commentsList = document.getElementById(`comments-list-${dropId}`);
-  if (commentsList) {
-          commentsList.innerHTML = renderComments(drop.discussions);
-  }
-  
-  // Update the discussion count in the modal header
-  const modalHeader = document.querySelector('.discussion-modal-content h4');
-  if (modalHeader) {
-          modalHeader.textContent = `Comments (${drop.discussions.length})`;
-        }
-  }
-  
-  // Clear the textarea
-  textarea.value = '';
-  
-  // Update the main page
+      console.log('Comment successfully synced with API');
+      // Refresh from API to get any other updates
       const freshData = await getSoundDrops();
       renderSoundDropsFromData(freshData);
       updateStatsFromData(freshData);
-      
     } else {
       const errorText = await response.text();
-      console.error('Failed to add comment:', response.status, errorText);
-      alert(`Failed to add comment. Error: ${response.status} - ${errorText}`);
+      console.log('API sync failed, but comment saved locally:', response.status, errorText);
     }
   } catch (error) {
-    console.error('Error adding comment:', error);
-    alert(`Network error adding comment: ${error.message}. Please check your connection and try again.`);
+    console.log('API sync failed, but comment saved locally:', error.message);
   }
 }
 
@@ -933,76 +945,68 @@ async function saveCommentEdit(commentId) {
     return;
   }
   
+  // Find the comment in localStorage first
+  const localDrops = getLocalBackup();
+  let targetDrop = null;
+  let targetComment = null;
+  
+  for (let drop of localDrops) {
+    const comment = drop.discussions.find(c => c.id == commentId);
+    if (comment) {
+      targetDrop = drop;
+      targetComment = comment;
+      break;
+    }
+  }
+  
+  if (!targetComment) {
+    alert('Comment not found');
+    return;
+  }
+  
+  // Update the comment locally first
+  targetComment.text = newText;
+  targetComment.edited = true;
+  targetComment.editedAt = Date.now();
+  
+  // Save to localStorage
+  localStorage.setItem('soundDropsBackup', JSON.stringify(localDrops));
+  
+  // Update the display immediately
+  document.getElementById(`comment-text-${commentId}`).textContent = newText;
+  document.getElementById(`comment-text-${commentId}`).style.display = 'block';
+  document.getElementById(`comment-edit-${commentId}`).style.display = 'none';
+  
+  // Add edited indicator
+  const commentHeader = document.querySelector(`#comment-${commentId} .comment-time`);
+  if (commentHeader && !commentHeader.textContent.includes('(edited)')) {
+    commentHeader.textContent += ' (edited)';
+  }
+  
+  // Show success message
+  showNotification('Comment updated successfully!', 'success');
+  
+  // Update main page display
+  renderSoundDropsFromData(localDrops);
+  updateStatsFromData(localDrops);
+  
+  // Try to sync with API in background
   try {
-    // Find the drop containing this comment
-    const drops = await getSoundDrops();
-    let targetDrop = null;
+    const response = await fetch(`/api/sound-drops/${targetDrop.id}/discussion/${commentId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ text: newText })
+    });
     
-    for (let drop of drops) {
-      const comment = drop.discussions.find(c => c.id == commentId);
-      if (comment) {
-        targetDrop = drop;
-        break;
-      }
+    if (response.ok) {
+      console.log('Comment edit successfully synced with API');
+    } else {
+      console.log('API edit sync failed, but comment saved locally');
     }
-    
-    if (!targetDrop) {
-      alert('Comment not found');
-      return;
-    }
-    
-    // Try to update via API first
-    try {
-      const response = await fetch(`/api/sound-drops/${targetDrop.id}/discussion/${commentId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ text: newText })
-      });
-      
-      if (response.ok) {
-        // Show success message
-        showNotification('Comment updated successfully!', 'success');
-        
-        // API success - refresh data and UI
-        const freshData = await getSoundDrops();
-        await renderSoundDropsFromData(freshData);
-        await updateStatsFromData(freshData);
-        
-        // Close edit mode
-        document.getElementById(`comment-text-${commentId}`).style.display = 'block';
-        document.getElementById(`comment-edit-${commentId}`).style.display = 'none';
-        
-        console.log('Comment updated successfully via API');
-        return;
-      }
-    } catch (apiError) {
-      console.log('API edit failed, using localStorage fallback');
-    }
-    
-    // Fallback to localStorage if API fails
-    const comment = targetDrop.discussions.find(c => c.id == commentId);
-    comment.text = newText;
-    comment.edited = true;
-    comment.editedAt = Date.now();
-    
-    await updateCommentInStorage(targetDrop);
-    
-    // Update the display
-    document.getElementById(`comment-text-${commentId}`).textContent = newText;
-    document.getElementById(`comment-text-${commentId}`).style.display = 'block';
-    document.getElementById(`comment-edit-${commentId}`).style.display = 'none';
-    
-    // Add edited indicator
-    const commentHeader = document.querySelector(`#comment-${commentId} .comment-time`);
-    if (!commentHeader.textContent.includes('(edited)')) {
-      commentHeader.textContent += ' (edited)';
-    }
-    
   } catch (error) {
-    console.error('Error editing comment:', error);
-    alert('Failed to edit comment. Please try again.');
+    console.log('API edit sync failed, but comment saved locally:', error.message);
   }
 }
 
@@ -1011,91 +1015,62 @@ async function deleteComment(commentId) {
     return;
   }
   
-  try {
-    // Find the drop containing this comment
-    const drops = await getSoundDrops();
-    let targetDrop = null;
-    
-    for (let drop of drops) {
-      const comment = drop.discussions.find(c => c.id == commentId);
-      if (comment) {
-        targetDrop = drop;
-        break;
-      }
-    }
-    
-    if (!targetDrop) {
-      alert('Comment not found');
-      return;
-    }
-    
-    // Try to delete via API first
-    try {
-      const response = await fetch(`/api/sound-drops/${targetDrop.id}/discussion/${commentId}`, {
-        method: 'DELETE'
-      });
-      
-      if (response.ok) {
-        // API success - remove from display immediately
-        const commentElement = document.getElementById(`comment-${commentId}`);
-        if (commentElement) {
-          commentElement.remove();
-        }
-        
-        // Show success message
-        showNotification('Comment deleted successfully!', 'success');
-        
-        // Refresh data and UI
-        const freshData = await getSoundDrops();
-        await renderSoundDropsFromData(freshData);
-        await updateStatsFromData(freshData);
-        
-        // Update discussion count in modal header if open
-        const modalHeader = document.querySelector('.discussion-modal-content h4');
-        if (modalHeader) {
-          const updatedDrop = freshData.find(d => d.id === targetDrop.id);
-          if (updatedDrop) {
-            modalHeader.textContent = `Comments (${updatedDrop.discussions.length})`;
-          }
-        }
-        
-        console.log('Comment deleted successfully via API');
-        return;
-      }
-    } catch (apiError) {
-      console.log('API delete failed, using localStorage fallback');
-    }
-    
-    // Fallback to localStorage if API fails
-    const commentIndex = targetDrop.discussions.findIndex(c => c.id == commentId);
+  // Find the comment in localStorage
+  const localDrops = getLocalBackup();
+  let targetDrop = null;
+  let commentIndex = -1;
+  
+  for (let drop of localDrops) {
+    commentIndex = drop.discussions.findIndex(c => c.id == commentId);
     if (commentIndex !== -1) {
-      targetDrop.discussions.splice(commentIndex, 1);
-      await updateCommentInStorage(targetDrop);
-      
-      // Remove from display immediately
-      const commentElement = document.getElementById(`comment-${commentId}`);
-      if (commentElement) {
-        commentElement.remove();
-      }
-      
-      // Show success message
-      showNotification('Comment deleted successfully!', 'success');
-      
-      // Update discussion count in modal header
-      const modalHeader = document.querySelector('.discussion-modal-content h4');
-      if (modalHeader) {
-        modalHeader.textContent = `Comments (${targetDrop.discussions.length})`;
-      }
-      
-      // Update the main page
-      const freshData = await getSoundDrops();
-      renderSoundDropsFromData(freshData);
-      updateStatsFromData(freshData);
+      targetDrop = drop;
+      break;
     }
+  }
+  
+  if (!targetDrop || commentIndex === -1) {
+    alert('Comment not found');
+    return;
+  }
+  
+  // Remove the comment locally first
+  targetDrop.discussions.splice(commentIndex, 1);
+  
+  // Save to localStorage
+  localStorage.setItem('soundDropsBackup', JSON.stringify(localDrops));
+  
+  // Remove from display immediately
+  const commentElement = document.getElementById(`comment-${commentId}`);
+  if (commentElement) {
+    commentElement.remove();
+  }
+  
+  // Show success message
+  showNotification('Comment deleted successfully!', 'success');
+  
+  // Update discussion count in modal header
+  const modalHeader = document.querySelector('.discussion-modal-content h4');
+  if (modalHeader) {
+    modalHeader.textContent = `Comments (${targetDrop.discussions.length})`;
+  }
+  
+  // Update the main page display
+  renderSoundDropsFromData(localDrops);
+  updateStatsFromData(localDrops);
+  
+  // Try to sync with API in background
+  try {
+    const response = await fetch(`/api/sound-drops/${targetDrop.id}/discussion/${commentId}`, {
+      method: 'DELETE'
+    });
     
+    if (response.ok) {
+      console.log('Comment deletion successfully synced with API');
+    } else {
+      console.log('API delete sync failed, but comment deleted locally');
+    }
   } catch (error) {
-    console.error('Error deleting comment:', error);
-    alert('Failed to delete comment. Please try again.');
+    console.log('API delete sync failed, but comment deleted locally:', error.message);
   }
 }
 
