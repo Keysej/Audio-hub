@@ -593,7 +593,9 @@ async function addComment(dropId) {
   }
   
   try {
-    const response = await fetch(`/api/sound-drops/${dropId}/discussion`, {
+    const apiUrl = `/api/sound-drops/${dropId}/discussion`;
+    console.log('Making comment API call to:', apiUrl);
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -637,12 +639,13 @@ async function addComment(dropId) {
       updateStatsFromData(freshData);
       
     } else {
-      console.error('Failed to add comment');
-      alert('Failed to add comment. Please try again.');
+      const errorText = await response.text();
+      console.error('Failed to add comment:', response.status, errorText);
+      alert(`Failed to add comment. Error: ${response.status} - ${errorText}`);
     }
   } catch (error) {
     console.error('Error adding comment:', error);
-    alert('Error adding comment. Please try again.');
+    alert(`Network error adding comment: ${error.message}. Please check your connection and try again.`);
   }
 }
 
