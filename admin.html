@@ -280,16 +280,17 @@
           console.log('API not available, will use localStorage');
         }
         
-        // If no API data, fall back to localStorage (same as main page)
+        // If no API data, fall back to localStorage (but with 7-day window for research)
         if (activeData.length === 0) {
           try {
             const stored = localStorage.getItem('soundDropsBackup');
             if (stored) {
               const localData = JSON.parse(stored);
-              // Filter out drops older than 24 hours (same logic as main page)
+              // For admin dashboard: show data from last 7 days (research needs)
               const now = Date.now();
-              activeData = localData.filter(drop => (now - drop.timestamp) < 24 * 60 * 60 * 1000);
-              console.log('Loaded data from localStorage:', activeData.length, 'drops');
+              const sevenDays = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+              activeData = localData.filter(drop => (now - drop.timestamp) < sevenDays);
+              console.log('Loaded data from localStorage (7-day window):', activeData.length, 'drops');
             }
           } catch (e) {
             console.error('Error reading localStorage:', e);
@@ -342,6 +343,7 @@
         <div style="background: #e8f4fd; padding: 10px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9em;">
           📊 Data Source: ${dataSource === 'localStorage' ? '💾 Local Storage (Browser)' : 
                             dataSource === 'API' ? '🌐 API Server' : '❌ No Data'}
+          <br><small>🗓️ Showing data from the last 7 days (research view)</small>
           ${dataSource === 'localStorage' ? '<br><small>💡 Data is from your browser storage. API sync may not be working.</small>' : ''}
         </div>
       `;
@@ -350,7 +352,7 @@
       if (activeData.length > 0) {
         html += `
           <div class="data-section">
-            <h2 class="section-title">🔴 Current Active Drops (${activeData.length})</h2>
+            <h2 class="section-title">📊 Research Data - Last 7 Days (${activeData.length})</h2>
             ${activeData.map(drop => createDropHTML(drop, 'active')).join('')}
           </div>
         `;
@@ -432,31 +434,67 @@
       }
     }
 
-    function exportData(format) {
+    async function exportData(format) {
       if (!adminAuthenticated) {
         alert('Please log in first');
         return;
       }
       
-      // For now, export current active data
-      // In future, this could call the backend export endpoint
-      fetch('/api/sound-drops')
-        .then(response => response.json())
-        .then(data => {
-          if (format === 'json') {
-            const exportData = {
-              export_timestamp: new Date().toISOString(),
-              total_drops: data.length,
-              data: data
-            };
-            downloadJSON(exportData, `sounddrop_research_${new Date().toISOString().split('T')[0]}.json`);
-          } else if (format === 'csv') {
-            downloadCSV(data, `sounddrop_research_${new Date().toISOString().split('T')[0]}.csv`);
+      try {
+        // Get the same data that's displayed in the dashboard (7-day window)
+        let exportData = [];
+        
+        // First try API
+        try {
+          const apiResponse = await fetch('/api/sound-drops');
+          if (apiResponse.ok) {
+            exportData = await apiResponse.json();
           }
-        })
-        .catch(error => {
-          alert('Export failed: ' + error.message);
-        });
+        } catch (e) {
+          console.log('API not available for export, using localStorage');
+        }
+        
+        // If no API data, use localStorage with 7-day window (same as dashboard)
+        if (exportData.length === 0) {
+          try {
+            const stored = localStorage.getItem('soundDropsBackup');
+            if (stored) {
+              const localData = JSON.parse(stored);
+              const now = Date.now();
+              const sevenDays = 7 * 24 * 60 * 60 * 1000;
+              exportData = localData.filter(drop => (now - drop.timestamp) < sevenDays);
+            }
+          } catch (e) {
+            console.error('Error reading localStorage for export:', e);
+          }
+        }
+        
+        if (exportData.length === 0) {
+          alert('No data available to export');
+          return;
+        }
+        
+        const timestamp = new Date().toISOString().split('T')[0];
+        
+        if (format === 'json') {
+          const jsonExport = {
+            export_info: {
+              timestamp: new Date().toISOString(),
+              total_drops: exportData.length,
+              date_range: '7 days',
+              total_comments: exportData.reduce((sum, drop) => sum + (drop.discussions?.length || 0), 0)
+            },
+            data: exportData
+          };
+          downloadJSON(jsonExport, `sounddrop_research_${timestamp}.json`);
+        } else if (format === 'csv') {
+          downloadCSV(exportData, `sounddrop_research_${timestamp}.csv`);
+        }
+        
+      } catch (error) {
+        console.error('Export error:', error);
+        alert('Export failed: ' + error.message);
+      }
     }
 
     function downloadJSON(data, filename) {
