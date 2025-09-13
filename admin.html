@@ -235,6 +235,7 @@
         <button class="export-btn" onclick="exportData('json')">📄 Export JSON</button>
         <button class="export-btn" onclick="exportData('csv')">📊 Export CSV</button>
         <button class="export-btn" onclick="refreshData()">🔄 Refresh Data</button>
+        <button class="export-btn" onclick="forceArchive()" style="background: #ff6b6b;">🗄️ Test Archive</button>
       </div>
 
       <!-- Data Display -->
@@ -300,13 +301,17 @@
         // Try to load archived data from research endpoint
         let archivedData = [];
         try {
-          const archivedResponse = await fetch(`/api/research/status`);
-          if (archivedResponse.ok) {
-            const researchStatus = await archivedResponse.json();
-            // This gives us count, we'd need another endpoint for full archived data
+          const exportResponse = await fetch('/api/research/export?format=json&key=research2024');
+          if (exportResponse.ok) {
+            const exportData = await exportResponse.json();
+            if (exportData.data) {
+              // Filter for archived data only
+              archivedData = exportData.data.filter(drop => drop.data_source === 'archived');
+              console.log('Loaded archived data from research API:', archivedData.length, 'drops');
+            }
           }
         } catch (e) {
-          console.log('MongoDB not available, showing local data only');
+          console.log('Research archive not available:', e);
         }
 
         // Update statistics
@@ -558,6 +563,28 @@
     function refreshData() {
       document.getElementById('data-display').innerHTML = '<div class="loading">Refreshing data...</div>';
       loadDashboardData();
+    }
+
+    async function forceArchive() {
+      if (!adminAuthenticated) {
+        alert('Please log in first');
+        return;
+      }
+      
+      try {
+        const response = await fetch('/api/research/force-archive?key=research2024');
+        const result = await response.json();
+        
+        if (response.ok) {
+          alert(`Archive Test Result:\n${result.message}\n\nFound: ${result.total_found || 0} drops\nArchived: ${result.archived || 0} drops`);
+          // Refresh the dashboard to show any newly archived data
+          refreshData();
+        } else {
+          alert(`Archive test failed: ${result.error || result.message}`);
+        }
+      } catch (error) {
+        alert(`Archive test error: ${error.message}`);
+      }
     }
 
     // Handle Enter key in password field
