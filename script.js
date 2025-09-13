@@ -309,15 +309,17 @@ async function startRecording() {
     
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     
-    // Check for MediaRecorder support and use best available format
+    // Check for MediaRecorder support and prioritize desktop-compatible formats
     let options = {};
-    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-      options.mimeType = 'audio/webm;codecs=opus';
+    if (MediaRecorder.isTypeSupported('audio/wav')) {
+      options.mimeType = 'audio/wav';
     } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
       options.mimeType = 'audio/mp4';
-    } else if (MediaRecorder.isTypeSupported('audio/wav')) {
-      options.mimeType = 'audio/wav';
+    } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+      options.mimeType = 'audio/webm;codecs=opus';
     }
+    
+    console.log('Using MediaRecorder with MIME type:', options.mimeType || 'default');
     
     mediaRecorder = new MediaRecorder(stream, options);
     audioChunks = [];
@@ -488,6 +490,82 @@ async function playAudio(dropId) {
   });
 }
 
+// Convert audio to WAV format for better desktop compatibility
+async function convertAudioToWav(audioBlob) {
+  return new Promise((resolve, reject) => {
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const fileReader = new FileReader();
+      
+      fileReader.onload = async function() {
+        try {
+          const arrayBuffer = fileReader.result;
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          
+          // Convert to WAV
+          const wavBlob = audioBufferToWav(audioBuffer);
+          resolve(wavBlob);
+        } catch (error) {
+          console.log('Audio conversion failed, using original:', error);
+          resolve(audioBlob); // Fallback to original
+        }
+      };
+      
+      fileReader.onerror = () => {
+        console.log('FileReader error, using original audio');
+        resolve(audioBlob); // Fallback to original
+      };
+      
+      fileReader.readAsArrayBuffer(audioBlob);
+    } catch (error) {
+      console.log('Conversion not supported, using original:', error);
+      resolve(audioBlob); // Fallback to original
+    }
+  });
+}
+
+// Convert AudioBuffer to WAV Blob
+function audioBufferToWav(buffer) {
+  const length = buffer.length;
+  const numberOfChannels = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const arrayBuffer = new ArrayBuffer(44 + length * numberOfChannels * 2);
+  const view = new DataView(arrayBuffer);
+  
+  // WAV header
+  const writeString = (offset, string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+  
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + length * numberOfChannels * 2, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numberOfChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * numberOfChannels * 2, true);
+  view.setUint16(32, numberOfChannels * 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, length * numberOfChannels * 2, true);
+  
+  // Convert audio data
+  let offset = 44;
+  for (let i = 0; i < length; i++) {
+    for (let channel = 0; channel < numberOfChannels; channel++) {
+      const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      offset += 2;
+    }
+  }
+  
+  return new Blob([arrayBuffer], { type: 'audio/wav' });
+}
+
 // Download audio
 async function downloadAudio(dropId) {
   const drops = await getSoundDrops();
@@ -498,30 +576,56 @@ async function downloadAudio(dropId) {
       const dataUrl = drop.audioData;
       const mimeMatch = dataUrl.match(/data:([^;]+);base64,/);
       let fileExtension = '.wav'; // default
+      let downloadUrl = dataUrl;
       
       if (mimeMatch) {
         const mimeType = mimeMatch[1];
-        // Map MIME types to file extensions
-        if (mimeType.includes('webm')) {
-          fileExtension = '.webm';
-        } else if (mimeType.includes('mp4') || mimeType.includes('m4a')) {
-          fileExtension = '.mp4';
-        } else if (mimeType.includes('ogg')) {
-          fileExtension = '.ogg';
-        } else if (mimeType.includes('wav')) {
-          fileExtension = '.wav';
+        
+        // For WebM/Opus files, try to convert to WAV for better desktop compatibility
+        if (mimeType.includes('webm') && typeof AudioContext !== 'undefined') {
+          try {
+            console.log('Converting WebM to WAV for better desktop compatibility...');
+            
+            // Convert data URL back to blob
+            const response = await fetch(dataUrl);
+            const originalBlob = await response.blob();
+            
+            // Convert to WAV
+            const wavBlob = await convertAudioToWav(originalBlob);
+            downloadUrl = URL.createObjectURL(wavBlob);
+            fileExtension = '.wav';
+            
+            console.log('Successfully converted to WAV format');
+          } catch (conversionError) {
+            console.log('Conversion failed, using original format:', conversionError);
+            fileExtension = '.webm';
+          }
+        } else {
+          // Map other MIME types to file extensions
+          if (mimeType.includes('mp4') || mimeType.includes('m4a')) {
+            fileExtension = '.mp4';
+          } else if (mimeType.includes('ogg')) {
+            fileExtension = '.ogg';
+          } else if (mimeType.includes('wav')) {
+            fileExtension = '.wav';
+          }
         }
       }
       
       // Create download link
       const a = document.createElement('a');
-      a.href = dataUrl;
+      a.href = downloadUrl;
       a.download = `${drop.filename || 'recording'}${fileExtension}`;
       
       // Add to DOM, click, and remove
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      
+      // Clean up object URL if we created one
+      if (downloadUrl !== dataUrl) {
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      }
       
       console.log(`Downloaded audio as: ${drop.filename}${fileExtension}`);
     } catch (error) {
