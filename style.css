@@ -77,6 +77,15 @@ body {
   text-align: center;
 }
 
+.tagline {
+  font-size: 0.9em;
+  color: #7f8c8d;
+  margin: 5px 0 0 0;
+  text-align: center;
+  font-weight: 400;
+  font-style: italic;
+}
+
 .theme-section {
   margin-bottom: 30px;
 }

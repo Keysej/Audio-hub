@@ -125,7 +125,13 @@
       margin: 5px 0;
     }
     
-    .play-btn {
+    .drop-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    .play-btn, .download-btn {
       background: #ff6b6b;
       color: white;
       border: none;
@@ -133,11 +139,20 @@
       border-radius: 8px;
       cursor: pointer;
       font-size: 12px;
-      margin-left: 10px;
+      transition: all 0.3s ease;
     }
     
-    .play-btn:hover {
+    .play-btn:hover, .download-btn:hover {
       background: #ee5a24;
+      transform: translateY(-1px);
+    }
+    
+    .download-btn {
+      background: #28a745;
+    }
+    
+    .download-btn:hover {
+      background: #218838;
     }
     
     .comments-section {
@@ -403,7 +418,10 @@
         <div class="drop-item">
           <div class="drop-header">
             <h3 class="drop-title">${drop.theme || 'No Theme'}</h3>
-            ${drop.audioData ? `<button class="play-btn" onclick="playAudio('${drop.audioData}', this)">▶️ Play</button>` : ''}
+            <div class="drop-controls">
+              ${drop.audioData ? `<button class="play-btn" onclick="playAudio('${drop.audioData}', this)">▶️ Play</button>` : ''}
+              ${drop.audioData ? `<button class="download-btn" onclick="downloadAudio('${drop.audioData}', '${drop.filename || 'recording'}')">📥 Download</button>` : ''}
+            </div>
           </div>
           <div class="drop-meta">
             📅 ${timestamp} | 🎵 ${drop.type || 'Unknown'} | 📄 ${drop.filename || 'No filename'}
@@ -584,6 +602,25 @@
         }
       } catch (error) {
         alert(`Archive test error: ${error.message}`);
+      }
+    }
+
+    function downloadAudio(audioData, filename) {
+      if (!audioData) {
+        alert('No audio data available for download');
+        return;
+      }
+      
+      try {
+        const a = document.createElement('a');
+        a.href = audioData;
+        a.download = `${filename || 'recording'}.wav`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (error) {
+        console.error('Download error:', error);
+        alert('Failed to download audio file');
       }
     }
 
