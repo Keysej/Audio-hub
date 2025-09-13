@@ -327,7 +327,12 @@ async function startRecording() {
     };
     
     mediaRecorder.onstop = () => {
-      const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+      // Use the same MIME type as the recorder for the blob
+      const recordedMimeType = mediaRecorder.mimeType || 'audio/wav';
+      const audioBlob = new Blob(audioChunks, { type: recordedMimeType });
+      
+      console.log('Recording completed with MIME type:', recordedMimeType);
+      
       // Show save interface
       document.getElementById('share-drop-btn').style.display = 'block';
       document.getElementById('retake-btn').style.display = 'block';
@@ -487,11 +492,44 @@ async function playAudio(dropId) {
 async function downloadAudio(dropId) {
   const drops = await getSoundDrops();
   const drop = drops.find(d => d.id == dropId);
-  if (drop) {
-    const a = document.createElement('a');
-    a.href = drop.audioData;
-    a.download = `${drop.filename}.wav`;
-    a.click();
+  if (drop && drop.audioData) {
+    try {
+      // Extract the MIME type from the data URL
+      const dataUrl = drop.audioData;
+      const mimeMatch = dataUrl.match(/data:([^;]+);base64,/);
+      let fileExtension = '.wav'; // default
+      
+      if (mimeMatch) {
+        const mimeType = mimeMatch[1];
+        // Map MIME types to file extensions
+        if (mimeType.includes('webm')) {
+          fileExtension = '.webm';
+        } else if (mimeType.includes('mp4') || mimeType.includes('m4a')) {
+          fileExtension = '.mp4';
+        } else if (mimeType.includes('ogg')) {
+          fileExtension = '.ogg';
+        } else if (mimeType.includes('wav')) {
+          fileExtension = '.wav';
+        }
+      }
+      
+      // Create download link
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `${drop.filename || 'recording'}${fileExtension}`;
+      
+      // Add to DOM, click, and remove
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      console.log(`Downloaded audio as: ${drop.filename}${fileExtension}`);
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Failed to download audio file. Please try again.');
+    }
+  } else {
+    alert('Audio file not found or corrupted.');
   }
 }
 

@@ -612,12 +612,32 @@
       }
       
       try {
+        // Extract the MIME type from the data URL
+        const mimeMatch = audioData.match(/data:([^;]+);base64,/);
+        let fileExtension = '.wav'; // default
+        
+        if (mimeMatch) {
+          const mimeType = mimeMatch[1];
+          // Map MIME types to file extensions
+          if (mimeType.includes('webm')) {
+            fileExtension = '.webm';
+          } else if (mimeType.includes('mp4') || mimeType.includes('m4a')) {
+            fileExtension = '.mp4';
+          } else if (mimeType.includes('ogg')) {
+            fileExtension = '.ogg';
+          } else if (mimeType.includes('wav')) {
+            fileExtension = '.wav';
+          }
+        }
+        
         const a = document.createElement('a');
         a.href = audioData;
-        a.download = `${filename || 'recording'}.wav`;
+        a.download = `${filename || 'recording'}${fileExtension}`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        
+        console.log(`Downloaded audio as: ${filename}${fileExtension}`);
       } catch (error) {
         console.error('Download error:', error);
         alert('Failed to download audio file');
