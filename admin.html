@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin - SoundDrop</title>
+  <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.0/lame.min.js"></script>
   <link rel="stylesheet" href="style.css">
   <style>
     .admin-container {
@@ -605,37 +606,233 @@
       }
     }
 
-    function downloadAudio(audioData, filename) {
+    // MP3 conversion using LAME encoder (same as main page)
+    async function convertAudioToMp3(audioBlob) {
+      return new Promise(async (resolve) => {
+        try {
+          // Check if LAME library is available
+          if (typeof lamejs === 'undefined') {
+            console.log('LAME library not available, skipping MP3 conversion');
+            resolve(null);
+            return;
+          }
+          
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const fileReader = new FileReader();
+          
+          fileReader.onload = async function() {
+            try {
+              const arrayBuffer = fileReader.result;
+              const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+              
+              // Convert to mono for simplicity (MP3 encoding is complex for stereo)
+              const channels = audioBuffer.numberOfChannels;
+              const sampleRate = audioBuffer.sampleRate;
+              const length = audioBuffer.length;
+              
+              // Get audio data (convert to mono if stereo)
+              let samples;
+              if (channels === 1) {
+                samples = audioBuffer.getChannelData(0);
+              } else {
+                // Mix stereo to mono
+                const left = audioBuffer.getChannelData(0);
+                const right = audioBuffer.getChannelData(1);
+                samples = new Float32Array(length);
+                for (let i = 0; i < length; i++) {
+                  samples[i] = (left[i] + right[i]) / 2;
+                }
+              }
+              
+              // Convert float samples to 16-bit PCM
+              const pcmSamples = new Int16Array(length);
+              for (let i = 0; i < length; i++) {
+                const sample = Math.max(-1, Math.min(1, samples[i]));
+                pcmSamples[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+              }
+              
+              // Initialize LAME encoder
+              const mp3encoder = new lamejs.Mp3Encoder(1, sampleRate, 128); // Mono, sampleRate, 128kbps
+              const mp3Data = [];
+              
+              // Encode in chunks
+              const chunkSize = 1152; // LAME chunk size
+              for (let i = 0; i < pcmSamples.length; i += chunkSize) {
+                const chunk = pcmSamples.subarray(i, i + chunkSize);
+                const mp3buf = mp3encoder.encodeBuffer(chunk);
+                if (mp3buf.length > 0) {
+                  mp3Data.push(mp3buf);
+                }
+              }
+              
+              // Finalize encoding
+              const mp3buf = mp3encoder.flush();
+              if (mp3buf.length > 0) {
+                mp3Data.push(mp3buf);
+              }
+              
+              // Create MP3 blob
+              const mp3Blob = new Blob(mp3Data, { type: 'audio/mp3' });
+              console.log('Successfully encoded MP3:', mp3Blob.size, 'bytes');
+              resolve(mp3Blob);
+              
+            } catch (error) {
+              console.log('MP3 encoding failed:', error);
+              resolve(null);
+            }
+          };
+          
+          fileReader.onerror = () => {
+            console.log('FileReader error during MP3 conversion');
+            resolve(null);
+          };
+          
+          fileReader.readAsArrayBuffer(audioBlob);
+          
+        } catch (error) {
+          console.log('MP3 conversion setup failed:', error);
+          resolve(null);
+        }
+      });
+    }
+
+    // Convert AudioBuffer to WAV Blob (fallback)
+    function audioBufferToWav(buffer) {
+      const length = buffer.length;
+      const numberOfChannels = buffer.numberOfChannels;
+      const sampleRate = buffer.sampleRate;
+      const arrayBuffer = new ArrayBuffer(44 + length * numberOfChannels * 2);
+      const view = new DataView(arrayBuffer);
+      
+      // WAV header
+      const writeString = (offset, string) => {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
+      };
+      
+      writeString(0, 'RIFF');
+      view.setUint32(4, 36 + length * numberOfChannels * 2, true);
+      writeString(8, 'WAVE');
+      writeString(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, numberOfChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * numberOfChannels * 2, true);
+      view.setUint16(32, numberOfChannels * 2, true);
+      view.setUint16(34, 16, true);
+      writeString(36, 'data');
+      view.setUint32(40, length * numberOfChannels * 2, true);
+      
+      // Convert audio data
+      let offset = 44;
+      for (let i = 0; i < length; i++) {
+        for (let channel = 0; channel < numberOfChannels; channel++) {
+          const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
+          view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+          offset += 2;
+        }
+      }
+      
+      return new Blob([arrayBuffer], { type: 'audio/wav' });
+    }
+
+    // Convert audio to WAV format (fallback)
+    async function convertAudioToWav(audioBlob) {
+      return new Promise((resolve) => {
+        try {
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const fileReader = new FileReader();
+          
+          fileReader.onload = async function() {
+            try {
+              const arrayBuffer = fileReader.result;
+              const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+              
+              // Convert to WAV
+              const wavBlob = audioBufferToWav(audioBuffer);
+              resolve(wavBlob);
+            } catch (error) {
+              console.log('Audio conversion failed, using original:', error);
+              resolve(audioBlob); // Fallback to original
+            }
+          };
+          
+          fileReader.onerror = () => {
+            console.log('FileReader error, using original audio');
+            resolve(audioBlob); // Fallback to original
+          };
+          
+          fileReader.readAsArrayBuffer(audioBlob);
+        } catch (error) {
+          console.log('Conversion not supported, using original:', error);
+          resolve(audioBlob); // Fallback to original
+        }
+      });
+    }
+
+    // Enhanced download function with MP3 conversion (same as main page)
+    async function downloadAudio(audioData, filename) {
       if (!audioData) {
         alert('No audio data available for download');
         return;
       }
       
       try {
-        // Extract the MIME type from the data URL
         const mimeMatch = audioData.match(/data:([^;]+);base64,/);
-        let fileExtension = '.wav'; // default
+        let fileExtension = '.mp3'; // Default to MP3 for best compatibility
+        let downloadUrl = audioData;
         
         if (mimeMatch) {
           const mimeType = mimeMatch[1];
-          // Map MIME types to file extensions
-          if (mimeType.includes('webm')) {
-            fileExtension = '.webm';
-          } else if (mimeType.includes('mp4') || mimeType.includes('m4a')) {
-            fileExtension = '.mp4';
-          } else if (mimeType.includes('ogg')) {
-            fileExtension = '.ogg';
-          } else if (mimeType.includes('wav')) {
-            fileExtension = '.wav';
+          console.log('Original audio MIME type:', mimeType);
+          
+          // Always try to convert to MP3 for maximum desktop compatibility
+          if (typeof AudioContext !== 'undefined') {
+            try {
+              console.log('Converting audio to MP3 for maximum desktop compatibility...');
+              
+              // Convert data URL back to blob
+              const response = await fetch(audioData);
+              const originalBlob = await response.blob();
+              
+              // Convert to MP3 using LAME encoder
+              const mp3Blob = await convertAudioToMp3(originalBlob);
+              if (mp3Blob) {
+                downloadUrl = URL.createObjectURL(mp3Blob);
+                fileExtension = '.mp3';
+                console.log('Successfully converted to MP3 format');
+              } else {
+                // Fallback to WAV
+                const wavBlob = await convertAudioToWav(originalBlob);
+                downloadUrl = URL.createObjectURL(wavBlob);
+                fileExtension = '.wav';
+                console.log('Converted to WAV format as fallback');
+              }
+            } catch (conversionError) {
+              console.log('Conversion failed, using original format:', conversionError);
+              // Determine original file extension
+              if (mimeType.includes('mp4')) fileExtension = '.mp4';
+              else if (mimeType.includes('webm')) fileExtension = '.webm';
+              else if (mimeType.includes('wav')) fileExtension = '.wav';
+              else if (mimeType.includes('ogg')) fileExtension = '.ogg';
+            }
           }
         }
         
+        // Create download link
         const a = document.createElement('a');
-        a.href = audioData;
+        a.href = downloadUrl;
         a.download = `${filename || 'recording'}${fileExtension}`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        
+        // Clean up object URL if we created one
+        if (downloadUrl !== audioData) {
+          setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+        }
         
         console.log(`Downloaded audio as: ${filename}${fileExtension}`);
       } catch (error) {
