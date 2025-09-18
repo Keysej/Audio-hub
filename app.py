@@ -72,19 +72,20 @@ def archive_to_research_db(drop_data):
     return False
 
 def load_sound_drops():
-    """Load sound drops from file storage"""
+    """Load sound drops from file storage - returns only 24-hour data for main user interface"""
     try:
         if os.path.exists(STORAGE_FILE):
             with open(STORAGE_FILE, 'r') as f:
                 data = json.load(f)
                 
-                # Archive old drops to research database before filtering
+                # Archive drops older than 7 days to research database before filtering
                 now = datetime.datetime.now().timestamp() * 1000
-                expired_drops = [drop for drop in data if (now - drop['timestamp']) >= 24 * 60 * 60 * 1000]
+                seven_days_ms = 7 * 24 * 60 * 60 * 1000  # 7 days in milliseconds
+                expired_drops = [drop for drop in data if (now - drop['timestamp']) >= seven_days_ms]
                 
                 # Archive expired drops for research (if any)
                 if expired_drops:
-                    print(f"Found {len(expired_drops)} expired drops to archive")
+                    print(f"Found {len(expired_drops)} expired drops (>7 days) to archive")
                     archived_count = 0
                     for drop in expired_drops:
                         if archive_to_research_db(drop):
@@ -92,11 +93,12 @@ def load_sound_drops():
                     print(f"Successfully archived {archived_count}/{len(expired_drops)} drops")
                     
                     # Remove archived drops from main storage to prevent re-processing
-                    remaining_drops = [drop for drop in data if (now - drop['timestamp']) < 24 * 60 * 60 * 1000]
+                    remaining_drops = [drop for drop in data if (now - drop['timestamp']) < seven_days_ms]
                     save_sound_drops(remaining_drops)
                 
-                # Return only valid (non-expired) drops for user interface
-                valid_drops = [drop for drop in data if (now - drop['timestamp']) < 24 * 60 * 60 * 1000]
+                # Return only 24-hour data for main user interface (ephemeral experience)
+                twenty_four_hours_ms = 24 * 60 * 60 * 1000  # 24 hours in milliseconds
+                valid_drops = [drop for drop in data if (now - drop['timestamp']) < twenty_four_hours_ms]
                 return valid_drops
         return []
     except Exception as e:
@@ -968,6 +970,35 @@ def get_current_theme():
 def get_sound_drops():
     drops = load_sound_drops()
     return jsonify(drops)
+
+@app.route('/api/admin/sound-drops', methods=['GET'])
+def get_admin_sound_drops():
+    """Admin endpoint to get sound drops with 7-day retention for research purposes"""
+    # Check admin access
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or auth_header != 'Bearer research2024':
+        return jsonify({'error': 'Admin access required'}), 403
+    
+    try:
+        # Load ALL data from file storage (including expired ones for admin)
+        all_data = []
+        if os.path.exists(STORAGE_FILE):
+            with open(STORAGE_FILE, 'r') as f:
+                all_data = json.load(f)
+        
+        # For admin dashboard: show data from last 7 days (research needs)
+        now = datetime.datetime.now().timestamp() * 1000
+        seven_days_ms = 7 * 24 * 60 * 60 * 1000  # 7 days in milliseconds
+        
+        # Filter for 7-day window instead of 24-hour window
+        admin_drops = [drop for drop in all_data if (now - drop['timestamp']) < seven_days_ms]
+        
+        print(f"Admin API: Found {len(admin_drops)} drops within 7-day window (total in storage: {len(all_data)})")
+        return jsonify(admin_drops)
+        
+    except Exception as e:
+        print(f"Error in admin sound drops API: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/sound-drops', methods=['POST'])
 def create_sound_drop():

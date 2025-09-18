@@ -102,7 +102,7 @@ function getLocalBackup() {
   const validDrops = drops.filter(drop => (now - drop.timestamp) < 24 * 60 * 60 * 1000);
   
     console.log('Using localStorage backup:', validDrops.length, 'drops');
-    return validDrops;
+  return validDrops;
   } catch (error) {
     console.error('Error reading localStorage backup:', error);
     return [];
@@ -153,17 +153,17 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
         
         // Fallback: save to localStorage only
         console.log('Saving to localStorage as fallback');
-        const drop = {
-          id: Date.now(),
-          timestamp: Date.now(),
-          theme: getTodaysTheme().title,
-          audioData: reader.result,
-          context: context || '',
+    const drop = {
+      id: Date.now(),
+      timestamp: Date.now(),
+      theme: getTodaysTheme().title,
+      audioData: reader.result,
+      context: context || '',
           type: type,
-          filename: filename || `recording_${Date.now()}`,
-          discussions: []
-        };
-        
+      filename: filename || `recording_${Date.now()}`,
+      discussions: []
+    };
+    
         const backup = getLocalBackup();
         backup.unshift(drop);
         localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
@@ -624,13 +624,13 @@ async function downloadAudio(dropId) {
       }
       
       // Create download link
-      const a = document.createElement('a');
+    const a = document.createElement('a');
       a.href = downloadUrl;
       a.download = `${drop.filename || 'recording'}${fileExtension}`;
       
       // Add to DOM, click, and remove
       document.body.appendChild(a);
-      a.click();
+    a.click();
       document.body.removeChild(a);
       
       // Clean up object URL if we created one
@@ -807,7 +807,7 @@ function renderComments(comments) {
           <button class="delete-comment-btn" onclick="deleteComment('${comment.id}')" title="Delete comment">
             <i class="fa-solid fa-trash"></i>
           </button>
-        </div>
+      </div>
       </div>
       <div class="comment-text" id="comment-text-${comment.id}">${comment.text}</div>
       <div class="comment-edit" id="comment-edit-${comment.id}" style="display: none;">
