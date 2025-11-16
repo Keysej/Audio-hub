@@ -211,6 +211,12 @@ async function renderSoundDrops(filter = 'all') {
 function renderSoundDropsFromData(drops, filter = 'all') {
   const container = document.getElementById('sound-drops');
   
+  // Clean up existing timers before rendering new content
+  if (window.soundTimers) {
+    Object.values(window.soundTimers).forEach(timer => clearInterval(timer));
+    window.soundTimers = {};
+  }
+  
   let filteredDrops = drops;
   if (filter === 'recorded') filteredDrops = drops.filter(d => d.type === 'recorded');
   if (filter === 'uploaded') filteredDrops = drops.filter(d => d.type === 'uploaded');
@@ -223,7 +229,7 @@ function renderSoundDropsFromData(drops, filter = 'all') {
     dropEl.className = 'sound-drop';
     dropEl.innerHTML = `
       <div class="drop-header">
-        <div class="drop-time">${formatTime(drop.timestamp)}</div>
+        <div class="drop-time" id="timer-${drop.id}">${formatTime(drop.timestamp, `timer-${drop.id}`)}</div>
         <div class="drop-type">${drop.type}</div>
       </div>
       ${drop.type === 'link' ? 
@@ -231,7 +237,7 @@ function renderSoundDropsFromData(drops, filter = 'all') {
           <i class="fa-solid fa-external-link"></i>
           <a href="${drop.audioData}" target="_blank" rel="noopener">Open Audio Link</a>
         </div>` : 
-        `<div class="waveform">🎵 Audio Waveform</div>
+        `<div class="waveform"></div>
       <div class="drop-controls">
         <button class="play-btn" onclick="playAudio('${drop.id}')">
           <i class="fa-solid fa-play"></i>
@@ -244,24 +250,74 @@ function renderSoundDropsFromData(drops, filter = 'all') {
         <button class="discuss-btn" onclick="openDiscussion('${drop.id}')">
           <i class="fa-solid fa-comment"></i> Discuss (${drop.discussions.length})
         </button>
-        <button class="download-btn" onclick="downloadAudio('${drop.id}')">
-          <i class="fa-solid fa-download"></i> Download
-        </button>
       </div>
     `;
     container.appendChild(dropEl);
   });
 }
 
-// Format timestamp
-function formatTime(timestamp) {
+// Format timestamp - shows time until disappearance with live updates
+function formatTime(timestamp, elementId = null) {
   const now = Date.now();
-  const diff = now - timestamp;
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const twentyFourHours = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+  const disappearTime = timestamp + twentyFourHours;
+  const timeLeft = disappearTime - now;
   
-  if (hours > 0) return `${hours}h ${minutes}m ago`;
-  return `${minutes}m ago`;
+  // If already expired, show as expired
+  if (timeLeft <= 0) {
+    return 'Expired';
+  }
+  
+  const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+  const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+  
+  let timeString;
+  if (hours > 0) {
+    timeString = `Disappears in ${hours}h ${minutes}m`;
+  } else if (minutes > 0) {
+    timeString = `Disappears in ${minutes}m ${seconds}s`;
+  } else if (seconds > 0) {
+    timeString = `Disappears in ${seconds}s`;
+  } else {
+    timeString = 'Disappearing now...';
+  }
+  
+  // If elementId is provided, set up live updates for this specific element
+  if (elementId && timeLeft > 0) {
+    // Store the timer reference to avoid duplicates
+    if (!window.soundTimers) window.soundTimers = {};
+    
+    // Clear existing timer for this element
+    if (window.soundTimers[elementId]) {
+      clearInterval(window.soundTimers[elementId]);
+    }
+    
+    // Set up new timer for live updates
+    window.soundTimers[elementId] = setInterval(() => {
+      const element = document.getElementById(elementId);
+      if (element) {
+        const updatedTime = formatTime(timestamp); // Recursive call without elementId to avoid infinite loop
+        element.textContent = updatedTime;
+        
+        // If expired, clear the timer and potentially refresh the view
+        if (updatedTime === 'Expired') {
+          clearInterval(window.soundTimers[elementId]);
+          delete window.soundTimers[elementId];
+          // Optionally trigger a refresh of the sound drops
+          setTimeout(() => {
+            getSoundDrops().then(drops => renderSoundDropsFromData(drops));
+          }, 1000);
+        }
+      } else {
+        // Element no longer exists, clear the timer
+        clearInterval(window.soundTimers[elementId]);
+        delete window.soundTimers[elementId];
+      }
+    }, 1000);
+  }
+  
+  return timeString;
 }
 
 // Update countdown timer
@@ -297,38 +353,50 @@ function updateStatsFromData(drops) {
 // Start recording
 async function startRecording() {
   try {
-    // Enhanced audio constraints for better mobile compatibility
+    // Enhanced audio constraints for better desktop Chrome compatibility
     const constraints = {
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
-        sampleRate: 44100
+        sampleRate: 48000, // Chrome prefers 48kHz
+        sampleSize: 16,
+        channelCount: 1 // Mono for better compatibility and smaller files
       }
     };
     
+    console.log('Requesting audio stream with constraints:', constraints);
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     
-    // Try different approaches for maximum compatibility
-    let options = {};
-    
-    // First, try to force a more compatible format
-    if (MediaRecorder.isTypeSupported('audio/mp4;codecs=mp4a.40.2')) {
-      options.mimeType = 'audio/mp4;codecs=mp4a.40.2'; // AAC in MP4 - very compatible
-    } else if (MediaRecorder.isTypeSupported('audio/mpeg')) {
-      options.mimeType = 'audio/mpeg'; // MP3 if supported
-    } else if (MediaRecorder.isTypeSupported('audio/wav')) {
-      options.mimeType = 'audio/wav';
-    } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-      options.mimeType = 'audio/mp4';
-    } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=pcm')) {
-      options.mimeType = 'audio/webm;codecs=pcm'; // PCM in WebM
-    } else {
-      // Last resort - use default (usually WebM/Opus)
-      console.log('Using default MediaRecorder format - may need conversion');
+    // Log actual stream settings for debugging
+    const audioTrack = stream.getAudioTracks()[0];
+    if (audioTrack) {
+      const settings = audioTrack.getSettings();
+      console.log('Actual audio track settings:', settings);
     }
     
-    console.log('Using MediaRecorder with MIME type:', options.mimeType || 'default');
+    // Try different approaches for maximum compatibility, prioritizing desktop Chrome
+    let options = {};
+    
+    // Desktop Chrome compatibility order
+    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+      options.mimeType = 'audio/webm;codecs=opus';
+      options.audioBitsPerSecond = 128000; // 128kbps for good quality
+    } else if (MediaRecorder.isTypeSupported('audio/mp4;codecs=mp4a.40.2')) {
+      options.mimeType = 'audio/mp4;codecs=mp4a.40.2'; // AAC in MP4
+      options.audioBitsPerSecond = 128000;
+    } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+      options.mimeType = 'audio/webm';
+      options.audioBitsPerSecond = 128000;
+    } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+      options.mimeType = 'audio/wav';
+    } else {
+      // Last resort - use default
+      console.log('Using default MediaRecorder format');
+      options.audioBitsPerSecond = 128000;
+    }
+    
+    console.log('Using MediaRecorder with options:', options);
     
     mediaRecorder = new MediaRecorder(stream, options);
     audioChunks = [];
@@ -339,19 +407,47 @@ async function startRecording() {
     
     mediaRecorder.onstop = () => {
       // Use the same MIME type as the recorder for the blob
-      const recordedMimeType = mediaRecorder.mimeType || 'audio/wav';
-      const audioBlob = new Blob(audioChunks, { type: recordedMimeType });
+      const recordedMimeType = mediaRecorder.mimeType || 'audio/webm';
+      console.log('Recording stopped. Chunks received:', audioChunks.length);
+      console.log('Total audio data size:', audioChunks.reduce((total, chunk) => total + chunk.size, 0), 'bytes');
       
-      console.log('Recording completed with MIME type:', recordedMimeType);
+      // Validate that we have actual audio data
+      if (audioChunks.length === 0) {
+        console.error('No audio chunks received - recording may have failed');
+        alert('Recording failed - no audio data received. Please check your microphone permissions and try again.');
+        return;
+      }
+      
+      const audioBlob = new Blob(audioChunks, { type: recordedMimeType });
+      console.log('Recording completed with MIME type:', recordedMimeType, 'Final blob size:', audioBlob.size, 'bytes');
+      
+      // Additional validation for empty or too-small recordings
+      if (audioBlob.size < 1000) { // Less than 1KB is likely empty/corrupted
+        console.error('Recording appears to be empty or corrupted (size:', audioBlob.size, 'bytes)');
+        alert('Recording appears to be empty. Please check your microphone and try again.');
+        return;
+      }
       
       // Show save interface
       document.getElementById('share-drop-btn').style.display = 'block';
       document.getElementById('retake-btn').style.display = 'block';
       document.getElementById('audio-preview').style.display = 'block';
       
-      // Set up audio preview
+      // Set up audio preview with error handling
       const audioUrl = URL.createObjectURL(audioBlob);
-      document.getElementById('preview-audio').src = audioUrl;
+      const previewAudio = document.getElementById('preview-audio');
+      previewAudio.src = audioUrl;
+      
+      // Add error handling for audio preview
+      previewAudio.onerror = (e) => {
+        console.error('Audio preview failed:', e);
+        console.log('Trying to create a more compatible audio preview...');
+        // The audio might still be saveable even if preview fails
+      };
+      
+      previewAudio.onloadeddata = () => {
+        console.log('Audio preview loaded successfully. Duration:', previewAudio.duration, 'seconds');
+      };
       
       document.getElementById('share-drop-btn').onclick = async () => {
         const context = document.getElementById('sound-context').value;
@@ -1004,8 +1100,45 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('file-upload').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (file) {
+      console.log('File selected:', file.name, 'Type:', file.type, 'Size:', file.size, 'bytes');
+      
+      // Validate file type
+      const validAudioTypes = [
+        'audio/wav', 'audio/wave', 'audio/x-wav',
+        'audio/mp3', 'audio/mpeg', 'audio/mp4', 'audio/m4a',
+        'audio/webm', 'audio/ogg', 'audio/aac',
+        'audio/flac', 'audio/x-flac'
+      ];
+      
+      const isValidAudio = validAudioTypes.includes(file.type) || 
+                          file.name.toLowerCase().match(/\.(wav|mp3|m4a|mp4|webm|ogg|aac|flac)$/);
+      
+      if (!isValidAudio) {
+        alert('Please select a valid audio file (WAV, MP3, M4A, WebM, OGG, AAC, or FLAC)');
+        e.target.value = ''; // Clear the input
+        return;
+      }
+      
+      // Check file size (limit to 50MB)
+      if (file.size > 50 * 1024 * 1024) {
+        alert('File is too large. Please select an audio file smaller than 50MB.');
+        e.target.value = ''; // Clear the input
+        return;
+      }
+      
       const context = prompt(`How does this sound relate to today's theme: "${theme.title}"?`);
-      await saveSoundDrop(file, context, 'uploaded', file.name);
+      if (context !== null) { // User didn't cancel the prompt
+        try {
+          await saveSoundDrop(file, context, 'uploaded', file.name);
+          e.target.value = ''; // Clear the input after successful upload
+        } catch (error) {
+          console.error('File upload failed:', error);
+          alert('Failed to upload file. Please try again.');
+          e.target.value = ''; // Clear the input on error
+        }
+      } else {
+        e.target.value = ''; // Clear the input if user canceled
+      }
     }
   });
   

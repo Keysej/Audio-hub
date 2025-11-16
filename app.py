@@ -980,20 +980,55 @@ def get_admin_sound_drops():
         return jsonify({'error': 'Admin access required'}), 403
     
     try:
-        # Load ALL data from file storage (including expired ones for admin)
-        all_data = []
+        # Load data from file storage (active data)
+        file_data = []
         if os.path.exists(STORAGE_FILE):
             with open(STORAGE_FILE, 'r') as f:
-                all_data = json.load(f)
+                file_data = json.load(f)
         
-        # For admin dashboard: show data from last 7 days (research needs)
+        # Also load recent data from MongoDB archive (last 7 days)
+        archived_data = []
+        try:
+            if mongo_db is not None:
+                now = datetime.datetime.now().timestamp() * 1000
+                seven_days_ms = 7 * 24 * 60 * 60 * 1000  # 7 days in milliseconds
+                cutoff_time = now - seven_days_ms
+                
+                # Query MongoDB for recent archived data
+                recent_archived = list(mongo_db.sound_drops.find({
+                    'timestamp': {'$gte': cutoff_time}
+                }))
+                
+                # Convert MongoDB documents to the same format as file data
+                for doc in recent_archived:
+                    if '_id' in doc:
+                        del doc['_id']  # Remove MongoDB ID
+                    archived_data.append(doc)
+                
+                print(f"Admin API: Found {len(archived_data)} recent drops in MongoDB archive")
+        except Exception as mongo_error:
+            print(f"MongoDB query failed (continuing without archived data): {mongo_error}")
+        
+        # Combine file data and archived data
+        all_data = file_data + archived_data
+        
+        # Remove duplicates (in case something exists in both places)
+        seen_ids = set()
+        unique_data = []
+        for drop in all_data:
+            if drop['id'] not in seen_ids:
+                unique_data.append(drop)
+                seen_ids.add(drop['id'])
+        
+        # Filter for 7-day window
         now = datetime.datetime.now().timestamp() * 1000
         seven_days_ms = 7 * 24 * 60 * 60 * 1000  # 7 days in milliseconds
+        admin_drops = [drop for drop in unique_data if (now - drop['timestamp']) < seven_days_ms]
         
-        # Filter for 7-day window instead of 24-hour window
-        admin_drops = [drop for drop in all_data if (now - drop['timestamp']) < seven_days_ms]
+        # Sort by timestamp (newest first)
+        admin_drops.sort(key=lambda x: x['timestamp'], reverse=True)
         
-        print(f"Admin API: Found {len(admin_drops)} drops within 7-day window (total in storage: {len(all_data)})")
+        print(f"Admin API: Found {len(admin_drops)} drops within 7-day window (file: {len(file_data)}, archived: {len(archived_data)})")
         return jsonify(admin_drops)
         
     except Exception as e:
