@@ -91,17 +91,27 @@ function mergeDrops(apiDrops, localDrops) {
   return merged.sort((a, b) => b.timestamp - a.timestamp);
 }
 
-// Get sound drops from localStorage backup
+// Get sound drops from localStorage backup with strict 24-hour filtering
 function getLocalBackup() {
   try {
     const stored = localStorage.getItem('soundDropsBackup');
   const drops = stored ? JSON.parse(stored) : [];
   
-  // Filter out drops older than 24 hours
+    // Filter out drops older than 24 hours (strict filtering)
   const now = Date.now();
-  const validDrops = drops.filter(drop => (now - drop.timestamp) < 24 * 60 * 60 * 1000);
+    const twentyFourHours = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    const validDrops = drops.filter(drop => {
+      const age = now - drop.timestamp;
+      return age < twentyFourHours;
+    });
+    
+    // If we filtered out any old drops, update localStorage to keep it clean
+  if (validDrops.length !== drops.length) {
+      console.log(`Cleaned up ${drops.length - validDrops.length} old drops from localStorage`);
+      localStorage.setItem('soundDropsBackup', JSON.stringify(validDrops));
+  }
   
-    console.log('Using localStorage backup:', validDrops.length, 'drops');
+    console.log('Using localStorage backup:', validDrops.length, 'drops (24-hour filtered)');
   return validDrops;
   } catch (error) {
     console.error('Error reading localStorage backup:', error);
@@ -1013,8 +1023,40 @@ function checkDeviceCapabilities() {
   return capabilities;
 }
 
+// Clean up old localStorage data on startup
+function cleanupOldData() {
+  try {
+    // Force cleanup of localStorage on every page load
+    const stored = localStorage.getItem('soundDropsBackup');
+    if (stored) {
+      const drops = JSON.parse(stored);
+      const now = Date.now();
+      const twentyFourHours = 24 * 60 * 60 * 1000;
+      const validDrops = drops.filter(drop => (now - drop.timestamp) < twentyFourHours);
+      
+      if (validDrops.length !== drops.length) {
+        console.log(`Startup cleanup: Removed ${drops.length - validDrops.length} old drops from localStorage`);
+        localStorage.setItem('soundDropsBackup', JSON.stringify(validDrops));
+      }
+      
+      // If no valid drops remain, clear localStorage completely
+      if (validDrops.length === 0) {
+        console.log('No valid drops found - clearing localStorage');
+        localStorage.removeItem('soundDropsBackup');
+      }
+    }
+  } catch (error) {
+    console.error('Error during startup cleanup:', error);
+    // If there's an error, clear the corrupted data
+    localStorage.removeItem('soundDropsBackup');
+  }
+}
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
+  // Clean up old data first
+  cleanupOldData();
+  
   // Check device capabilities first
   const capabilities = checkDeviceCapabilities();
   
@@ -1139,6 +1181,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   setInterval(async () => {
     try {
       console.log('Auto-refreshing data for real-time collaboration...');
+      
+      // Clean up old localStorage data during refresh
+      cleanupOldData();
+      
       const freshData = await getSoundDrops();
       await renderSoundDropsFromData(freshData);
       await updateStatsFromData(freshData);
