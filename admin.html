@@ -251,7 +251,6 @@
         <button class="export-btn" onclick="exportData('json')">📄 Export JSON</button>
         <button class="export-btn" onclick="exportData('csv')">📊 Export CSV</button>
         <button class="export-btn" onclick="refreshData()">🔄 Refresh Data</button>
-        <button class="export-btn" onclick="forceArchive()" style="background: #ff6b6b;">🗄️ Test Archive</button>
       </div>
 
       <!-- Data Display -->
@@ -608,27 +607,6 @@
       loadDashboardData();
     }
 
-    async function forceArchive() {
-      if (!adminAuthenticated) {
-        alert('Please log in first');
-        return;
-      }
-      
-      try {
-        const response = await fetch('/api/research/force-archive?key=research2024');
-        const result = await response.json();
-        
-        if (response.ok) {
-          alert(`Archive Test Result:\n${result.message}\n\nFound: ${result.total_found || 0} drops\nArchived: ${result.archived || 0} drops`);
-          // Refresh the dashboard to show any newly archived data
-          refreshData();
-        } else {
-          alert(`Archive test failed: ${result.error || result.message}`);
-        }
-      } catch (error) {
-        alert(`Archive test error: ${error.message}`);
-      }
-    }
 
     // MP3 conversion using LAME encoder (same as main page)
     async function convertAudioToMp3(audioBlob) {

@@ -777,50 +777,6 @@ def research_status():
             'timestamp': datetime.datetime.now().isoformat()
         }), 500
 
-@app.route('/api/research/force-archive')
-def force_archive():
-    """Force archive old drops for testing purposes"""
-    # Check admin access
-    if request.args.get('key') != 'research2024':
-        return "Access denied", 403
-    
-    try:
-        if os.path.exists(STORAGE_FILE):
-            with open(STORAGE_FILE, 'r') as f:
-                data = json.load(f)
-                
-                # Find drops older than 1 minute for testing (instead of 24 hours)
-                now = datetime.datetime.now().timestamp() * 1000
-                test_expired = [drop for drop in data if (now - drop['timestamp']) >= 60 * 1000]  # 1 minute
-                
-                if test_expired:
-                    archived_count = 0
-                    for drop in test_expired:
-                        if archive_to_research_db(drop):
-                            archived_count += 1
-                    
-                    return jsonify({
-                        'status': 'success',
-                        'message': f'Force archived {archived_count}/{len(test_expired)} drops for testing',
-                        'total_found': len(test_expired),
-                        'archived': archived_count
-                    })
-                else:
-                    return jsonify({
-                        'status': 'no_data',
-                        'message': 'No drops found to archive (none older than 1 minute)',
-                        'total_drops': len(data)
-                    })
-        else:
-            return jsonify({
-                'status': 'no_file',
-                'message': 'No storage file found'
-            })
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'error': str(e)
-        }), 500
 
 @app.route('/api/research/export')
 def export_research_data():
