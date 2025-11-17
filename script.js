@@ -211,12 +211,6 @@ async function renderSoundDrops(filter = 'all') {
 function renderSoundDropsFromData(drops, filter = 'all') {
   const container = document.getElementById('sound-drops');
   
-  // Clean up existing timers before rendering new content
-  if (window.soundTimers) {
-    Object.values(window.soundTimers).forEach(timer => clearInterval(timer));
-    window.soundTimers = {};
-  }
-  
   let filteredDrops = drops;
   if (filter === 'recorded') filteredDrops = drops.filter(d => d.type === 'recorded');
   if (filter === 'uploaded') filteredDrops = drops.filter(d => d.type === 'uploaded');
@@ -229,9 +223,6 @@ function renderSoundDropsFromData(drops, filter = 'all') {
     dropEl.className = 'sound-drop';
     dropEl.innerHTML = `
       <div class="drop-header">
-        <div class="drop-time" id="timer-${drop.id}">
-          <i class="fa-solid fa-clock"></i> ${formatTime(drop.timestamp, `timer-${drop.id}`)}
-        </div>
         <div class="drop-type">${drop.type}</div>
       </div>
       ${drop.type === 'link' ? 
@@ -258,61 +249,7 @@ function renderSoundDropsFromData(drops, filter = 'all') {
   });
 }
 
-// Format timestamp - shows time until disappearance with live updates (matches theme countdown format)
-function formatTime(timestamp, elementId = null) {
-  const now = Date.now();
-  const twentyFourHours = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-  const disappearTime = timestamp + twentyFourHours;
-  const timeLeft = disappearTime - now;
-  
-  // If already expired, show as expired
-  if (timeLeft <= 0) {
-    return 'Expired';
-  }
-  
-  const hours = Math.floor(timeLeft / (1000 * 60 * 60));
-  const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-  const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
-  
-  // Use same HH:MM:SS format as theme countdown for consistency
-  const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  
-  // If elementId is provided, set up live updates for this specific element
-  if (elementId && timeLeft > 0) {
-    // Store the timer reference to avoid duplicates
-    if (!window.soundTimers) window.soundTimers = {};
-    
-    // Clear existing timer for this element
-    if (window.soundTimers[elementId]) {
-      clearInterval(window.soundTimers[elementId]);
-    }
-    
-    // Set up new timer for live updates
-    window.soundTimers[elementId] = setInterval(() => {
-      const element = document.getElementById(elementId);
-      if (element) {
-        const updatedTime = formatTime(timestamp); // Recursive call without elementId to avoid infinite loop
-        element.textContent = updatedTime;
-        
-        // If expired, clear the timer and potentially refresh the view
-        if (updatedTime === 'Expired') {
-          clearInterval(window.soundTimers[elementId]);
-          delete window.soundTimers[elementId];
-          // Optionally trigger a refresh of the sound drops
-          setTimeout(() => {
-            getSoundDrops().then(drops => renderSoundDropsFromData(drops));
-          }, 1000);
-        }
-      } else {
-        // Element no longer exists, clear the timer
-        clearInterval(window.soundTimers[elementId]);
-        delete window.soundTimers[elementId];
-      }
-    }, 1000);
-  }
-  
-  return timeString;
-}
+// Simplified - no individual timers needed, only unified countdown
 
 // Update countdown timer
 function updateCountdown() {
@@ -847,7 +784,7 @@ async function openDiscussion(dropId) {
           <button class="play-btn" onclick="playAudio('${drop.id}')">
             <i class="fa-solid fa-play"></i>
           </button>
-          <span>Uploaded ${formatTime(drop.timestamp)}</span>
+          <span>Uploaded today</span>
         </div>
         ${drop.context ? `<div class="drop-context">"${drop.context}"</div>` : ''}
       </div>
@@ -889,7 +826,7 @@ function renderComments(comments) {
     <div class="comment" id="comment-${comment.id}">
       <div class="comment-header">
         <span class="comment-author">A Group Member</span>
-        <span class="comment-time">${formatTime(comment.timestamp)}</span>
+        <span class="comment-time">today</span>
         <div class="comment-actions">
           <button class="edit-comment-btn" onclick="editComment('${comment.id}')" title="Edit comment">
             <i class="fa-solid fa-edit"></i>

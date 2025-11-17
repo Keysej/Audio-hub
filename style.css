@@ -145,6 +145,63 @@ body {
   100% { box-shadow: 0 0 15px rgba(255, 235, 59, 0.8); }
 }
 
+/* Unified countdown styles - orange theme for everything resets */
+.unified-countdown {
+  background: linear-gradient(135deg, rgba(255, 87, 34, 0.15), rgba(255, 152, 0, 0.15));
+  padding: 16px 24px;
+  border-radius: 16px;
+  border: 2px solid rgba(255, 87, 34, 0.4);
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(255, 87, 34, 0.2);
+}
+
+.countdown-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.countdown-main i {
+  font-size: 1.8em;
+  color: #ff5722;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.unified-countdown #countdown-timer {
+  font-size: 2.2em;
+  font-weight: 800;
+  color: #ff5722;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  background: rgba(255, 87, 34, 0.1);
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 87, 34, 0.3);
+  letter-spacing: 2px;
+  font-family: 'Courier New', monospace;
+  animation: orangeGlow 2s infinite alternate;
+}
+
+@keyframes orangeGlow {
+  0% { box-shadow: 0 0 8px rgba(255, 87, 34, 0.5); }
+  100% { box-shadow: 0 0 20px rgba(255, 87, 34, 0.8); }
+}
+
+.countdown-label {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #ff5722;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
 .stats {
   font-size: 1em;
   opacity: 0.9;
