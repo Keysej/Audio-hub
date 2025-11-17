@@ -251,7 +251,7 @@ function renderSoundDropsFromData(drops, filter = 'all') {
 
 // Simplified - no individual timers needed, only unified countdown
 
-// Update countdown timer
+// Update countdown timer with dynamic colors based on time remaining
 function updateCountdown() {
   const now = new Date();
   const tomorrow = new Date(now);
@@ -263,8 +263,56 @@ function updateCountdown() {
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
   const seconds = Math.floor((diff % (1000 * 60)) / 1000);
   
-  document.getElementById('countdown-timer').textContent = 
+  const timerElement = document.getElementById('countdown-timer');
+  const countdownContainer = document.querySelector('.unified-countdown');
+  const hourglassIcon = document.querySelector('.countdown-main i');
+  
+  // Update the time display
+  timerElement.textContent = 
     `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  
+  // Dynamic color scheme based on time remaining
+  if (hours >= 12) {
+    // Green: 12+ hours left (safe zone)
+    updateCountdownColors('#4caf50', 'rgba(76, 175, 80, 0.15)', 'rgba(76, 175, 80, 0.4)', 'rgba(76, 175, 80, 0.2)', 'fa-hourglass-start');
+  } else if (hours >= 6) {
+    // Yellow: 6-12 hours left (caution zone)
+    updateCountdownColors('#ffeb3b', 'rgba(255, 235, 59, 0.15)', 'rgba(255, 235, 59, 0.4)', 'rgba(255, 235, 59, 0.2)', 'fa-hourglass-half');
+  } else if (hours >= 2) {
+    // Orange: 2-6 hours left (warning zone)
+    updateCountdownColors('#ff9800', 'rgba(255, 152, 0, 0.15)', 'rgba(255, 152, 0, 0.4)', 'rgba(255, 152, 0, 0.2)', 'fa-hourglass-half');
+  } else {
+    // Red: Less than 2 hours left (critical zone)
+    updateCountdownColors('#f44336', 'rgba(244, 67, 54, 0.15)', 'rgba(244, 67, 54, 0.4)', 'rgba(244, 67, 54, 0.2)', 'fa-hourglass-end');
+  }
+}
+
+// Helper function to update countdown colors and icon
+function updateCountdownColors(textColor, bgColor, borderColor, shadowColor, iconClass) {
+  const timerElement = document.getElementById('countdown-timer');
+  const countdownContainer = document.querySelector('.unified-countdown');
+  const hourglassIcon = document.querySelector('.countdown-main i');
+  const countdownLabel = document.querySelector('.countdown-label');
+  
+  if (timerElement && countdownContainer && hourglassIcon && countdownLabel) {
+    // Update timer colors
+    timerElement.style.color = textColor;
+    timerElement.style.background = bgColor;
+    timerElement.style.borderColor = borderColor;
+    timerElement.style.boxShadow = `0 0 15px ${shadowColor}`;
+    
+    // Update container colors
+    countdownContainer.style.background = `linear-gradient(135deg, ${bgColor}, ${bgColor})`;
+    countdownContainer.style.borderColor = borderColor;
+    countdownContainer.style.boxShadow = `0 4px 12px ${shadowColor}`;
+    
+    // Update icon and label colors
+    hourglassIcon.style.color = textColor;
+    countdownLabel.style.color = textColor;
+    
+    // Update icon class for visual progression
+    hourglassIcon.className = `fa-solid ${iconClass}`;
+  }
 }
 
 // Update stats
