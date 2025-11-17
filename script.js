@@ -229,7 +229,9 @@ function renderSoundDropsFromData(drops, filter = 'all') {
     dropEl.className = 'sound-drop';
     dropEl.innerHTML = `
       <div class="drop-header">
-        <div class="drop-time" id="timer-${drop.id}">${formatTime(drop.timestamp, `timer-${drop.id}`)}</div>
+        <div class="drop-time" id="timer-${drop.id}">
+          <i class="fa-solid fa-clock"></i> ${formatTime(drop.timestamp, `timer-${drop.id}`)}
+        </div>
         <div class="drop-type">${drop.type}</div>
       </div>
       ${drop.type === 'link' ? 
@@ -256,7 +258,7 @@ function renderSoundDropsFromData(drops, filter = 'all') {
   });
 }
 
-// Format timestamp - shows time until disappearance with live updates
+// Format timestamp - shows time until disappearance with live updates (matches theme countdown format)
 function formatTime(timestamp, elementId = null) {
   const now = Date.now();
   const twentyFourHours = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
@@ -272,16 +274,8 @@ function formatTime(timestamp, elementId = null) {
   const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
   const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
   
-  let timeString;
-  if (hours > 0) {
-    timeString = `Disappears in ${hours}h ${minutes}m`;
-  } else if (minutes > 0) {
-    timeString = `Disappears in ${minutes}m ${seconds}s`;
-  } else if (seconds > 0) {
-    timeString = `Disappears in ${seconds}s`;
-  } else {
-    timeString = 'Disappearing now...';
-  }
+  // Use same HH:MM:SS format as theme countdown for consistency
+  const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   
   // If elementId is provided, set up live updates for this specific element
   if (elementId && timeLeft > 0) {
