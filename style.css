@@ -202,6 +202,33 @@ body {
   letter-spacing: 1px;
 }
 
+/* Connection status indicator */
+.connection-status {
+  margin-left: 15px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.connection-status.online {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+  border: 1px solid rgba(76, 175, 80, 0.4);
+}
+
+.connection-status.offline {
+  background: rgba(255, 152, 0, 0.2);
+  color: #ff9800;
+  border: 1px solid rgba(255, 152, 0, 0.4);
+}
+
+.connection-status.checking {
+  background: rgba(158, 158, 158, 0.2);
+  color: #9e9e9e;
+  border: 1px solid rgba(158, 158, 158, 0.4);
+}
+
 .stats {
   font-size: 1em;
   opacity: 0.9;

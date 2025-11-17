@@ -53,24 +53,52 @@ async function getSoundDrops() {
     
     if (response.ok) {
       const data = await response.json();
-      console.log('Fetched sound drops:', data.length, 'drops');
+      console.log('✅ API SUCCESS: Fetched', data.length, 'drops from server');
       
-      // Get local backup to merge with API data
+      // Update connection status
+      updateConnectionStatus('online');
+      
+      // API data is the source of truth - update localStorage to match
+      localStorage.setItem('soundDropsBackup', JSON.stringify(data));
+      
+      // Also merge with any local-only pending uploads
       const localBackup = getLocalBackup();
+      const localOnlyDrops = localBackup.filter(localDrop => 
+        !data.some(apiDrop => apiDrop.id === localDrop.id)
+      );
       
-      // Merge API data with local backup (API data takes precedence, but keep local-only items)
-      const mergedData = mergeDrops(data, localBackup);
+      if (localOnlyDrops.length > 0) {
+        console.log('📤 Found', localOnlyDrops.length, 'local-only drops (pending upload)');
+        const mergedData = [...data, ...localOnlyDrops].sort((a, b) => b.timestamp - a.timestamp);
+        return mergedData;
+      }
       
-      // Store merged data as backup
-      localStorage.setItem('soundDropsBackup', JSON.stringify(mergedData));
-      return mergedData;
+      return data;
     } else {
       const errorText = await response.text();
-      console.error('Failed to fetch sound drops:', response.status, errorText);
-      return getLocalBackup();
+      console.warn('⚠️ API FAILED:', response.status, errorText);
+      
+      // Update connection status
+      updateConnectionStatus('offline');
+      
+      // Fallback to localStorage but show warning
+      console.log('📱 Using localStorage fallback (browsers may show different data)');
+      const localData = getLocalBackup();
+      
+      // Show user that they're in offline mode
+      if (localData.length === 0) {
+        console.log('💡 No local data - showing welcome message');
+      }
+      
+      return localData;
     }
   } catch (error) {
-    console.error('Error fetching sound drops:', error);
+    console.error('🚨 API ERROR:', error);
+    
+    // Update connection status
+    updateConnectionStatus('offline');
+    
+    console.log('📱 Using localStorage fallback due to network error');
     return getLocalBackup();
   }
 }
@@ -159,10 +187,13 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
         updateStatsFromData(freshData);
       } else {
         const errorText = await response.text();
-        console.error('Failed to save sound drop:', response.status, errorText);
+        console.error('❌ UPLOAD FAILED:', response.status, errorText);
+        
+        // Show user-friendly error message
+        alert(`Upload failed (${response.status}): ${errorText}\n\nYour sound has been saved locally and will sync when the server is available.`);
         
         // Fallback: save to localStorage only
-        console.log('Saving to localStorage as fallback');
+        console.log('💾 Saving to localStorage as fallback');
     const drop = {
       id: Date.now(),
       timestamp: Date.now(),
@@ -183,10 +214,13 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
         updateStatsFromData(freshData);
       }
     } catch (error) {
-      console.error('Error saving sound drop:', error);
+      console.error('🚨 NETWORK ERROR:', error);
+      
+      // Show user-friendly error message
+      alert(`Network error: ${error.message}\n\nYour sound has been saved locally and will sync when connection is restored.`);
       
       // Network error fallback: save to localStorage only
-      console.log('Network error - saving to localStorage as fallback');
+      console.log('💾 Network error - saving to localStorage as fallback');
     const drop = {
       id: Date.now(),
       timestamp: Date.now(),
@@ -1021,6 +1055,31 @@ function checkDeviceCapabilities() {
   }
   
   return capabilities;
+}
+
+// Update connection status indicator
+function updateConnectionStatus(status) {
+  const statusElement = document.getElementById('connection-status');
+  if (!statusElement) return;
+  
+  // Remove all status classes
+  statusElement.classList.remove('online', 'offline', 'checking');
+  
+  switch (status) {
+    case 'online':
+      statusElement.classList.add('online');
+      statusElement.textContent = '🟢 Online - Synced across browsers';
+      break;
+    case 'offline':
+      statusElement.classList.add('offline');
+      statusElement.textContent = '🟡 Offline - Local only (browsers may differ)';
+      break;
+    case 'checking':
+    default:
+      statusElement.classList.add('checking');
+      statusElement.textContent = '🔄 Checking connection...';
+      break;
+  }
 }
 
 // Clean up old localStorage data on startup
