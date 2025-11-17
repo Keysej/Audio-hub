@@ -55,8 +55,6 @@ async function getSoundDrops() {
       const data = await response.json();
       console.log('✅ API SUCCESS: Fetched', data.length, 'drops from server');
       
-      // Update connection status
-      updateConnectionStatus('online');
       
       // API data is the source of truth - update localStorage to match
       localStorage.setItem('soundDropsBackup', JSON.stringify(data));
@@ -78,8 +76,6 @@ async function getSoundDrops() {
       const errorText = await response.text();
       console.warn('⚠️ API FAILED:', response.status, errorText);
       
-      // Update connection status
-      updateConnectionStatus('offline');
       
       // Fallback to localStorage but show warning
       console.log('📱 Using localStorage fallback (browsers may show different data)');
@@ -95,8 +91,6 @@ async function getSoundDrops() {
   } catch (error) {
     console.error('🚨 API ERROR:', error);
     
-    // Update connection status
-    updateConnectionStatus('offline');
     
     console.log('📱 Using localStorage fallback due to network error');
     return getLocalBackup();
