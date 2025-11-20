@@ -55,23 +55,31 @@ async function getSoundDrops() {
       const data = await response.json();
       console.log('✅ API SUCCESS: Fetched', data.length, 'drops from server');
       
+      // Filter API data to only include sounds from today (since local midnight)
+      const now = new Date();
+      const todayMidnight = new Date(now);
+      todayMidnight.setHours(0, 0, 0, 0);
+      const todayMidnightMs = todayMidnight.getTime();
+      
+      const todayDrops = data.filter(drop => drop.timestamp >= todayMidnightMs);
+      console.log(`Filtered to ${todayDrops.length} drops from today (since ${todayMidnight.toLocaleString()})`);
       
       // API data is the source of truth - update localStorage to match
-      localStorage.setItem('soundDropsBackup', JSON.stringify(data));
+      localStorage.setItem('soundDropsBackup', JSON.stringify(todayDrops));
       
       // Also merge with any local-only pending uploads
       const localBackup = getLocalBackup();
       const localOnlyDrops = localBackup.filter(localDrop => 
-        !data.some(apiDrop => apiDrop.id === localDrop.id)
+        !todayDrops.some(apiDrop => apiDrop.id === localDrop.id)
       );
       
       if (localOnlyDrops.length > 0) {
         console.log('📤 Found', localOnlyDrops.length, 'local-only drops (pending upload)');
-        const mergedData = [...data, ...localOnlyDrops].sort((a, b) => b.timestamp - a.timestamp);
+        const mergedData = [...todayDrops, ...localOnlyDrops].sort((a, b) => b.timestamp - a.timestamp);
         return mergedData;
       }
       
-      return data;
+      return todayDrops;
     } else {
       const errorText = await response.text();
       console.warn('⚠️ API FAILED:', response.status, errorText);
@@ -119,12 +127,13 @@ function getLocalBackup() {
     const stored = localStorage.getItem('soundDropsBackup');
   const drops = stored ? JSON.parse(stored) : [];
   
-    // Filter out drops older than 24 hours (strict filtering)
-  const now = Date.now();
-    const twentyFourHours = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    // Filter out drops from before today's midnight (same as theme reset)
+  const now = new Date();
+    const todayMidnight = new Date(now);
+    todayMidnight.setHours(0, 0, 0, 0);
+    const todayMidnightMs = todayMidnight.getTime();
     const validDrops = drops.filter(drop => {
-      const age = now - drop.timestamp;
-      return age < twentyFourHours;
+      return drop.timestamp >= todayMidnightMs;
     });
     
     // If we filtered out any old drops, update localStorage to keep it clean
@@ -1083,9 +1092,11 @@ function cleanupOldData() {
     const stored = localStorage.getItem('soundDropsBackup');
     if (stored) {
       const drops = JSON.parse(stored);
-      const now = Date.now();
-      const twentyFourHours = 24 * 60 * 60 * 1000;
-      const validDrops = drops.filter(drop => (now - drop.timestamp) < twentyFourHours);
+      const now = new Date();
+      const todayMidnight = new Date(now);
+      todayMidnight.setHours(0, 0, 0, 0);
+      const todayMidnightMs = todayMidnight.getTime();
+      const validDrops = drops.filter(drop => drop.timestamp >= todayMidnightMs);
       
       if (validDrops.length !== drops.length) {
         console.log(`Startup cleanup: Removed ${drops.length - validDrops.length} old drops from localStorage`);

@@ -96,9 +96,11 @@ def load_sound_drops():
                     remaining_drops = [drop for drop in data if (now - drop['timestamp']) < seven_days_ms]
                     save_sound_drops(remaining_drops)
                 
-                # Return only 24-hour data for main user interface (ephemeral experience)
-                twenty_four_hours_ms = 24 * 60 * 60 * 1000  # 24 hours in milliseconds
-                valid_drops = [drop for drop in data if (now - drop['timestamp']) < twenty_four_hours_ms]
+                # Return sounds from the last 30 hours to account for timezone differences
+                # Frontend will do the precise filtering based on user's local midnight
+                thirty_hours_ms = 30 * 60 * 60 * 1000  # 30 hours in milliseconds
+                valid_drops = [drop for drop in data if (now - drop['timestamp']) < thirty_hours_ms]
+                print(f"Backend: Returning {len(valid_drops)} drops from last 30 hours (frontend will filter to local midnight)")
                 return valid_drops
         return []
     except Exception as e:
