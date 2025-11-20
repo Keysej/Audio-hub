@@ -37,8 +37,20 @@ let audioChunks = [];
 let recordingStartTime;
 let recordingInterval;
 
-// Get today's theme
-function getTodaysTheme() {
+// Get today's theme from API to ensure consistency with backend
+async function getTodaysTheme() {
+  try {
+    const response = await fetch('/api/theme');
+    if (response.ok) {
+      const theme = await response.json();
+      console.log('✅ Got theme from API:', theme.title);
+      return theme;
+    }
+  } catch (error) {
+    console.warn('⚠️ Failed to get theme from API, using local calculation:', error);
+  }
+  
+  // Fallback to local calculation if API fails
   const today = new Date();
   const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
   return themes[dayOfYear % themes.length];
@@ -1125,7 +1137,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const capabilities = checkDeviceCapabilities();
   
   // Set today's theme
-  const theme = getTodaysTheme();
+  const theme = await getTodaysTheme();
   document.getElementById('daily-theme').textContent = `"${theme.title}"`;
   document.getElementById('theme-description').textContent = theme.description;
   

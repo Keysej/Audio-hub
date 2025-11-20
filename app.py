@@ -924,6 +924,12 @@ def get_current_theme():
     day_of_year = today.timetuple().tm_yday
     return themes[day_of_year % len(themes)]
 
+@app.route('/api/theme', methods=['GET'])
+def get_theme():
+    """Get current theme - ensures frontend and backend use same theme"""
+    theme = get_current_theme()
+    return jsonify(theme)
+
 @app.route('/api/sound-drops', methods=['GET'])
 def get_sound_drops():
     drops = load_sound_drops()
