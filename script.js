@@ -1399,13 +1399,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }, 10 * 1000);
   
-  // EMERGENCY WORKAROUND: Show demo sounds when API is down
-  // This helps students see what a populated feed looks like
+  // Only show demo content if API is completely broken AND no local data exists
+  // Don't show demo if we're getting empty arrays from a working API
   setTimeout(async () => {
     const currentData = getLocalBackup();
     if (currentData.length === 0) {
-      console.log('🚨 API is down and no local data - showing demo content');
-      await showDemoContent();
+      // Check if API is actually responding (even with empty data)
+      try {
+        const testResponse = await fetch('/api/status');
+        if (!testResponse.ok) {
+          console.log('🚨 API is down and no local data - showing demo content');
+          await showDemoContent();
+        } else {
+          console.log('✅ API is working but empty - this is normal for a fresh day');
+        }
+      } catch (error) {
+        console.log('🚨 API is down and no local data - showing demo content');
+        await showDemoContent();
+      }
     }
   }, 5000);
 });
@@ -1459,52 +1470,27 @@ function showErrorMessage(message, type = 'error') {
 
 // EMERGENCY WORKAROUND: Show demo content when API is down
 async function showDemoContent() {
-  const currentTheme = await getTodaysTheme();
-  const demoDrops = [
-    {
-      id: Date.now() - 1000,
-      timestamp: Date.now() - 3600000, // 1 hour ago
-      theme: currentTheme.title,
-      audioData: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT',
-      context: 'Demo: City traffic sounds',
-      type: 'recorded',
-      filename: 'demo_traffic.wav',
-      discussions: [
-        {
-          id: Date.now() - 500,
-          comment: 'This really captures the urban energy!',
-          timestamp: Date.now() - 1800000 // 30 min ago
-        }
-      ]
-    },
-    {
-      id: Date.now() - 2000,
-      timestamp: Date.now() - 7200000, // 2 hours ago
-      theme: currentTheme.title,
-      audioData: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT',
-      context: 'Demo: Coffee shop ambiance',
-      type: 'recorded',
-      filename: 'demo_coffee.wav',
-      discussions: []
-    }
-  ];
+  console.log('🎭 Showing demo content because API is completely unavailable');
   
-  // Add demo message
+  // Clear any existing content first
   const container = document.getElementById('sound-drops');
+  container.innerHTML = '';
+  
+  // Add clear demo message
   const demoMessage = document.createElement('div');
   demoMessage.className = 'demo-message';
   demoMessage.innerHTML = `
     <div class="demo-notice">
-      <h3>🚨 Demo Mode</h3>
-      <p>The server is temporarily unavailable. These are example sounds to show how SoundDrop works.</p>
-      <p>Your recordings are saved locally and will sync when the server is restored.</p>
+      <h3>🚨 Demo Mode - Server Unavailable</h3>
+      <p>The server is temporarily down. These are example sounds to show how SoundDrop works.</p>
+      <p><strong>You can still record sounds</strong> - they'll be saved locally and sync when the server is restored.</p>
+      <button onclick="location.reload()" style="margin-top: 10px; padding: 8px 16px; background: #fff; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">🔄 Try Again</button>
     </div>
   `;
-  container.insertBefore(demoMessage, container.firstChild);
+  container.appendChild(demoMessage);
   
-  // Render demo drops
-  await renderSoundDropsFromData(demoDrops);
-  await updateStatsFromData(demoDrops);
+  // Don't show fake sounds - just show the message
+  // This prevents confusion between real and demo content
 }
 
 // Show link modal
