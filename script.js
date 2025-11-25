@@ -100,6 +100,15 @@ async function getSoundDrops() {
       const errorText = await response.text();
       console.warn('⚠️ API FAILED:', response.status, errorText);
       
+      // Try backup sharing service
+      console.log('🔄 Trying backup sharing service...');
+      const backupData = await tryBackupService();
+      if (backupData && backupData.length > 0) {
+        console.log('✅ Got data from backup service:', backupData.length, 'drops');
+        hideLoadingIndicator();
+        return backupData;
+      }
+      
       // Show user-friendly error message
       showErrorMessage('Unable to connect to server. You may only see your own sounds until connection is restored.');
       
@@ -119,6 +128,15 @@ async function getSoundDrops() {
   } catch (error) {
     console.error('🚨 API ERROR:', error);
     
+    // Try backup sharing service
+    console.log('🔄 Trying backup sharing service...');
+    const backupData = await tryBackupService();
+    if (backupData && backupData.length > 0) {
+      console.log('✅ Got data from backup service:', backupData.length, 'drops');
+      hideLoadingIndicator();
+      return backupData;
+    }
+    
     // Show user-friendly error message
     showErrorMessage('Network connection failed. You may only see your own sounds until connection is restored.');
     
@@ -126,6 +144,31 @@ async function getSoundDrops() {
     hideLoadingIndicator();
     return getLocalBackup();
   }
+}
+
+// Backup sharing service for cross-device sync when API is down
+// Using a simple approach with localStorage sync across tabs/windows
+async function tryBackupService() {
+  try {
+    // For now, just return empty array - we'll implement a real service later
+    // This is a placeholder for when we set up proper backup sharing
+    console.log('🔄 Backup service not yet implemented - using localStorage only');
+    return [];
+  } catch (error) {
+    console.log('🔄 Backup service failed:', error);
+  }
+  return [];
+}
+
+async function saveToBackupService(drops) {
+  try {
+    // For now, just log - we'll implement a real service later
+    console.log('🔄 Backup service save not yet implemented');
+    return true;
+  } catch (error) {
+    console.log('🔄 Failed to save to backup service:', error);
+  }
+  return false;
 }
 
 // Merge API drops with local backup drops
@@ -208,6 +251,9 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
         backup.unshift(result.drop);
         localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
         
+        // Also try to save to backup service for cross-device sharing
+        await saveToBackupService(backup);
+        
         const freshData = await getSoundDrops();
         renderSoundDropsFromData(freshData);
         updateStatsFromData(freshData);
@@ -236,6 +282,9 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
         backup.unshift(drop);
         localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
         
+        // Also try to save to backup service for cross-device sharing
+        await saveToBackupService(backup);
+        
         const freshData = getLocalBackup();
         renderSoundDropsFromData(freshData);
         updateStatsFromData(freshData);
@@ -263,6 +312,9 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
       const backup = getLocalBackup();
       backup.unshift(drop);
       localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
+      
+      // Also try to save to backup service for cross-device sharing
+      await saveToBackupService(backup);
       
       await renderSoundDrops();
       await updateStats();
