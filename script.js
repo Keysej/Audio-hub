@@ -58,6 +58,9 @@ async function getTodaysTheme() {
 
 // Get sound drops from shared API with localStorage fallback
 async function getSoundDrops() {
+  // Show loading indicator
+  showLoadingIndicator('Loading sounds from other users...');
+  
   try {
     console.log('Fetching sound drops from API...');
     const response = await fetch('/api/sound-drops');
@@ -91,11 +94,14 @@ async function getSoundDrops() {
         return mergedData;
       }
       
+      hideLoadingIndicator();
       return todayDrops;
     } else {
       const errorText = await response.text();
       console.warn('⚠️ API FAILED:', response.status, errorText);
       
+      // Show user-friendly error message
+      showErrorMessage('Unable to connect to server. You may only see your own sounds until connection is restored.');
       
       // Fallback to localStorage but show warning
       console.log('📱 Using localStorage fallback (browsers may show different data)');
@@ -104,15 +110,20 @@ async function getSoundDrops() {
       // Show user that they're in offline mode
       if (localData.length === 0) {
         console.log('💡 No local data - showing welcome message');
+        showWelcomeMessage();
       }
       
+      hideLoadingIndicator();
       return localData;
     }
   } catch (error) {
     console.error('🚨 API ERROR:', error);
     
+    // Show user-friendly error message
+    showErrorMessage('Network connection failed. You may only see your own sounds until connection is restored.');
     
     console.log('📱 Using localStorage fallback due to network error');
+    hideLoadingIndicator();
     return getLocalBackup();
   }
 }
@@ -209,10 +220,11 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
         
         // Fallback: save to localStorage only
         console.log('💾 Saving to localStorage as fallback');
+        const fallbackTheme = await getTodaysTheme();
     const drop = {
       id: Date.now(),
       timestamp: Date.now(),
-      theme: getTodaysTheme().title,
+      theme: fallbackTheme.title,
       audioData: reader.result,
       context: context || '',
           type: type,
@@ -236,10 +248,11 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
       
       // Network error fallback: save to localStorage only
       console.log('💾 Network error - saving to localStorage as fallback');
+      const fallbackTheme = await getTodaysTheme();
     const drop = {
       id: Date.now(),
       timestamp: Date.now(),
-      theme: getTodaysTheme().title,
+      theme: fallbackTheme.title,
       audioData: reader.result,
       context: context || '',
         type: type,
@@ -562,9 +575,10 @@ function updateRecordingTime() {
 }
 
 // Show recording section
-function showRecordingSection() {
+async function showRecordingSection() {
   document.getElementById('recording-section').style.display = 'block';
-  document.getElementById('recording-theme').textContent = getTodaysTheme().title;
+  const currentTheme = await getTodaysTheme();
+  document.getElementById('recording-theme').textContent = currentTheme.title;
 }
 
 // Hide recording section
@@ -1292,6 +1306,50 @@ document.addEventListener('DOMContentLoaded', async () => {
   }, 10 * 1000);
 });
 
+// Show loading indicator
+function showLoadingIndicator(message = 'Loading...') {
+  let indicator = document.getElementById('loading-indicator');
+  if (!indicator) {
+    indicator = document.createElement('div');
+    indicator.id = 'loading-indicator';
+    indicator.className = 'loading-indicator';
+    document.body.appendChild(indicator);
+  }
+  indicator.innerHTML = `
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <p>${message}</p>
+    </div>
+  `;
+  indicator.style.display = 'flex';
+}
+
+// Hide loading indicator
+function hideLoadingIndicator() {
+  const indicator = document.getElementById('loading-indicator');
+  if (indicator) {
+    indicator.style.display = 'none';
+  }
+}
+
+// Show error message
+function showErrorMessage(message) {
+  let errorDiv = document.getElementById('error-message');
+  if (!errorDiv) {
+    errorDiv = document.createElement('div');
+    errorDiv.id = 'error-message';
+    errorDiv.className = 'error-message';
+    document.body.appendChild(errorDiv);
+  }
+  errorDiv.textContent = message;
+  errorDiv.style.display = 'block';
+  
+  // Auto-hide after 5 seconds
+  setTimeout(() => {
+    errorDiv.style.display = 'none';
+  }, 5000);
+}
+
 // Show link modal
 function showLinkModal() {
   document.getElementById('link-modal').style.display = 'flex';
@@ -1358,10 +1416,11 @@ async function saveLinkDrop(link, context) {
       
       // Fallback: save to localStorage only
       console.log('Saving to localStorage as fallback');
+      const fallbackTheme = await getTodaysTheme();
       const drop = {
         id: Date.now(),
         timestamp: Date.now(),
-        theme: getTodaysTheme().title,
+        theme: fallbackTheme.title,
         audioData: link,
         context: context || '',
         type: 'link',
@@ -1382,10 +1441,11 @@ async function saveLinkDrop(link, context) {
     
     // Network error fallback: save to localStorage only
     console.log('Network error - saving to localStorage as fallback');
+    const fallbackTheme = await getTodaysTheme();
     const drop = {
       id: Date.now(),
       timestamp: Date.now(),
-      theme: getTodaysTheme().title,
+      theme: fallbackTheme.title,
       audioData: link,
       context: context || '',
       type: 'link',
