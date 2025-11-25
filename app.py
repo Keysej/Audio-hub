@@ -3,7 +3,6 @@ import datetime
 import base64
 import os
 import json
-import tempfile
 import csv
 import io
 from pymongo import MongoClient
@@ -72,9 +71,14 @@ def archive_to_research_db(drop_data):
             result = research_db.sound_drops_archive.insert_one(research_record)
             print(f"Archived drop {drop_data['id']} to research database: {result.inserted_id}")
             return True
+        else:
+            print("MongoDB not available - skipping archive (this is OK for basic functionality)")
+            return True  # Don't fail the whole operation if MongoDB is down
     except Exception as e:
-        print(f"Failed to archive to research database: {e}")
-    return False
+        print(f"Failed to archive to research database: {e} (continuing without archiving)")
+        return True  # Don't fail the whole operation
+    
+    return True
 
 def load_sound_drops():
     """Load sound drops from file storage - returns only 24-hour data for main user interface"""
