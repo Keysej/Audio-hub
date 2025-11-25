@@ -11,6 +11,11 @@ from pymongo.errors import ConnectionFailure, OperationFailure
 
 app = Flask(__name__)
 
+# Root route for basic testing
+@app.route('/')
+def root():
+    return jsonify({'message': 'SoundDrop API', 'status': 'running'})
+
 # Add datetime filter for templates
 @app.template_filter('datetime')
 def datetime_filter(timestamp, format='%Y-%m-%d %H:%M'):
@@ -744,6 +749,11 @@ def api_status():
             'error': str(e),
             'timestamp': datetime.datetime.now().isoformat()
         }), 500
+
+@app.route('/api/test')
+def test():
+    """Minimal test endpoint"""
+    return jsonify({'test': 'success', 'time': datetime.datetime.now().isoformat()})
 
 @app.route('/api/research/status')
 def research_status():
