@@ -1116,4 +1116,28 @@ body {
   max-width: 90%;
   text-align: center;
 }
+
+/* Demo mode message */
+.demo-message {
+  margin-bottom: 25px;
+}
+
+.demo-notice {
+  background: linear-gradient(135deg, #ff6b35, #f7931e);
+  color: white;
+  padding: 20px;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+}
+
+.demo-notice h3 {
+  margin: 0 0 10px 0;
+  font-size: 1.3em;
+}
+
+.demo-notice p {
+  margin: 8px 0;
+  opacity: 0.95;
+}
   

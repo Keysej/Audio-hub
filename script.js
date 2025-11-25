@@ -1304,6 +1304,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.log('Auto-refresh failed:', error);
     }
   }, 10 * 1000);
+  
+  // EMERGENCY WORKAROUND: Show demo sounds when API is down
+  // This helps students see what a populated feed looks like
+  setTimeout(async () => {
+    const currentData = getLocalBackup();
+    if (currentData.length === 0) {
+      console.log('🚨 API is down and no local data - showing demo content');
+      await showDemoContent();
+    }
+  }, 5000);
 });
 
 // Show loading indicator
@@ -1348,6 +1358,56 @@ function showErrorMessage(message) {
   setTimeout(() => {
     errorDiv.style.display = 'none';
   }, 5000);
+}
+
+// EMERGENCY WORKAROUND: Show demo content when API is down
+async function showDemoContent() {
+  const currentTheme = await getTodaysTheme();
+  const demoDrops = [
+    {
+      id: Date.now() - 1000,
+      timestamp: Date.now() - 3600000, // 1 hour ago
+      theme: currentTheme.title,
+      audioData: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT',
+      context: 'Demo: City traffic sounds',
+      type: 'recorded',
+      filename: 'demo_traffic.wav',
+      discussions: [
+        {
+          id: Date.now() - 500,
+          comment: 'This really captures the urban energy!',
+          timestamp: Date.now() - 1800000 // 30 min ago
+        }
+      ]
+    },
+    {
+      id: Date.now() - 2000,
+      timestamp: Date.now() - 7200000, // 2 hours ago
+      theme: currentTheme.title,
+      audioData: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT',
+      context: 'Demo: Coffee shop ambiance',
+      type: 'recorded',
+      filename: 'demo_coffee.wav',
+      discussions: []
+    }
+  ];
+  
+  // Add demo message
+  const container = document.getElementById('sound-drops');
+  const demoMessage = document.createElement('div');
+  demoMessage.className = 'demo-message';
+  demoMessage.innerHTML = `
+    <div class="demo-notice">
+      <h3>🚨 Demo Mode</h3>
+      <p>The server is temporarily unavailable. These are example sounds to show how SoundDrop works.</p>
+      <p>Your recordings are saved locally and will sync when the server is restored.</p>
+    </div>
+  `;
+  container.insertBefore(demoMessage, container.firstChild);
+  
+  // Render demo drops
+  await renderSoundDropsFromData(demoDrops);
+  await updateStatsFromData(demoDrops);
 }
 
 // Show link modal
