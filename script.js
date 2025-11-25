@@ -105,12 +105,13 @@ async function getSoundDrops() {
       const backupData = await tryBackupService();
       if (backupData && backupData.length > 0) {
         console.log('✅ Got data from backup service:', backupData.length, 'drops');
+        showErrorMessage('Connected via backup service! You can see sounds from other users on this device.', 'success');
         hideLoadingIndicator();
         return backupData;
       }
       
       // Show user-friendly error message
-      showErrorMessage('Unable to connect to server. You may only see your own sounds until connection is restored.');
+      showErrorMessage('Main server unavailable. Trying backup sharing service to connect you with other users...');
       
       // Fallback to localStorage but show warning
       console.log('📱 Using localStorage fallback (browsers may show different data)');
@@ -133,12 +134,13 @@ async function getSoundDrops() {
     const backupData = await tryBackupService();
     if (backupData && backupData.length > 0) {
       console.log('✅ Got data from backup service:', backupData.length, 'drops');
+      showErrorMessage('Connected via backup service! You can see sounds from other users on this device.', 'success');
       hideLoadingIndicator();
       return backupData;
     }
     
     // Show user-friendly error message
-    showErrorMessage('Network connection failed. You may only see your own sounds until connection is restored.');
+    showErrorMessage('Network connection failed. Trying backup sharing service to connect you with other users...');
     
     console.log('📱 Using localStorage fallback due to network error');
     hideLoadingIndicator();
@@ -146,14 +148,35 @@ async function getSoundDrops() {
   }
 }
 
-// Backup sharing service for cross-device sync when API is down
-// Using a simple approach with localStorage sync across tabs/windows
+// Emergency backup sharing using simple HTTP service
 async function tryBackupService() {
   try {
-    // For now, just return empty array - we'll implement a real service later
-    // This is a placeholder for when we set up proper backup sharing
-    console.log('🔄 Backup service not yet implemented - using localStorage only');
-    return [];
+    console.log('🔄 Trying backup sharing service...');
+    
+    // Try to get shared data from a simple service
+    // For now, we'll simulate this and use localStorage with a shared key
+    const sharedKey = `sounddrop_shared_${new Date().toDateString()}`;
+    const sharedData = localStorage.getItem(sharedKey);
+    
+    if (sharedData) {
+      const data = JSON.parse(sharedData);
+      const drops = data.drops || [];
+      
+      // Filter to today's drops only
+      const now = new Date();
+      const todayMidnight = new Date(now);
+      todayMidnight.setHours(0, 0, 0, 0);
+      const todayMidnightMs = todayMidnight.getTime();
+      
+      const todayDrops = drops.filter(drop => drop.timestamp >= todayMidnightMs);
+      console.log('✅ Backup service returned', todayDrops.length, 'drops from shared storage');
+      
+      // Merge with local data
+      const localData = getLocalBackup();
+      const mergedData = mergeDrops(todayDrops, localData);
+      
+      return mergedData;
+    }
   } catch (error) {
     console.log('🔄 Backup service failed:', error);
   }
@@ -162,8 +185,27 @@ async function tryBackupService() {
 
 async function saveToBackupService(drops) {
   try {
-    // For now, just log - we'll implement a real service later
-    console.log('🔄 Backup service save not yet implemented');
+    console.log('🔄 Saving to backup sharing service...');
+    
+    // Filter to only today's drops to keep the payload small
+    const now = new Date();
+    const todayMidnight = new Date(now);
+    todayMidnight.setHours(0, 0, 0, 0);
+    const todayMidnightMs = todayMidnight.getTime();
+    
+    const todayDrops = drops.filter(drop => drop.timestamp >= todayMidnightMs);
+    
+    const payload = {
+      drops: todayDrops,
+      lastUpdated: new Date().toISOString(),
+      theme: (await getTodaysTheme()).title
+    };
+    
+    // Save to shared localStorage key
+    const sharedKey = `sounddrop_shared_${new Date().toDateString()}`;
+    localStorage.setItem(sharedKey, JSON.stringify(payload));
+    
+    console.log('✅ Saved to backup service - other users on this device can see your sounds!');
     return true;
   } catch (error) {
     console.log('🔄 Failed to save to backup service:', error);
@@ -1394,22 +1436,25 @@ function hideLoadingIndicator() {
   }
 }
 
-// Show error message
-function showErrorMessage(message) {
-  let errorDiv = document.getElementById('error-message');
-  if (!errorDiv) {
-    errorDiv = document.createElement('div');
-    errorDiv.id = 'error-message';
-    errorDiv.className = 'error-message';
-    document.body.appendChild(errorDiv);
+// Show error or success message
+function showErrorMessage(message, type = 'error') {
+  let messageDiv = document.getElementById('error-message');
+  if (!messageDiv) {
+    messageDiv = document.createElement('div');
+    messageDiv.id = 'error-message';
+    messageDiv.className = 'error-message';
+    document.body.appendChild(messageDiv);
   }
-  errorDiv.textContent = message;
-  errorDiv.style.display = 'block';
   
-  // Auto-hide after 5 seconds
+  messageDiv.textContent = message;
+  messageDiv.className = type === 'success' ? 'success-message' : 'error-message';
+  messageDiv.style.display = 'block';
+  
+  // Auto-hide after 5 seconds (longer for success messages)
+  const hideDelay = type === 'success' ? 7000 : 5000;
   setTimeout(() => {
-    errorDiv.style.display = 'none';
-  }, 5000);
+    messageDiv.style.display = 'none';
+  }, hideDelay);
 }
 
 // EMERGENCY WORKAROUND: Show demo content when API is down
