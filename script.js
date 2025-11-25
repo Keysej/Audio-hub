@@ -523,18 +523,22 @@ async function startRecording() {
     // Try different approaches for maximum compatibility, prioritizing desktop Chrome
     let options = {};
     
-    // Desktop Chrome compatibility order
-    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-      options.mimeType = 'audio/webm;codecs=opus';
-      options.audioBitsPerSecond = 128000; // 128kbps for good quality
+    // Prioritize formats that convert well to WAV for downloads
+    if (MediaRecorder.isTypeSupported('audio/wav')) {
+      options.mimeType = 'audio/wav';
+      console.log('Using WAV format for maximum compatibility');
     } else if (MediaRecorder.isTypeSupported('audio/mp4;codecs=mp4a.40.2')) {
       options.mimeType = 'audio/mp4;codecs=mp4a.40.2'; // AAC in MP4
       options.audioBitsPerSecond = 128000;
+      console.log('Using MP4/AAC format');
+    } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+      options.mimeType = 'audio/webm;codecs=opus';
+      options.audioBitsPerSecond = 128000;
+      console.log('Using WebM/Opus format');
     } else if (MediaRecorder.isTypeSupported('audio/webm')) {
       options.mimeType = 'audio/webm';
       options.audioBitsPerSecond = 128000;
-    } else if (MediaRecorder.isTypeSupported('audio/wav')) {
-      options.mimeType = 'audio/wav';
+      console.log('Using generic WebM format');
     } else {
       // Last resort - use default
       console.log('Using default MediaRecorder format');
@@ -832,36 +836,58 @@ async function downloadAudio(dropId) {
         const mimeType = mimeMatch[1];
         console.log('Original audio MIME type:', mimeType);
         
-        // Always try to convert to MP3 for maximum desktop compatibility
+        // Always convert to WAV for maximum desktop compatibility and reliability
         if (typeof AudioContext !== 'undefined') {
           try {
-            console.log('Converting audio to MP3 for maximum desktop compatibility...');
+            console.log('Converting audio to WAV for maximum desktop compatibility...');
             
             // Convert data URL back to blob
             const response = await fetch(dataUrl);
             const originalBlob = await response.blob();
             
-            // Convert to MP3 using a simple approach
-            const mp3Blob = await convertAudioToMp3(originalBlob);
-            if (mp3Blob) {
-              downloadUrl = URL.createObjectURL(mp3Blob);
-              fileExtension = '.mp3';
-              console.log('Successfully converted to MP3 format');
-            } else {
-              // Fallback to WAV
-              const wavBlob = await convertAudioToWav(originalBlob);
+            // Convert to WAV - more reliable than MP3
+            const wavBlob = await convertAudioToWav(originalBlob);
+            if (wavBlob) {
               downloadUrl = URL.createObjectURL(wavBlob);
               fileExtension = '.wav';
-              console.log('Converted to WAV format as fallback');
+              console.log('Successfully converted to WAV format');
+            } else {
+              console.log('WAV conversion failed, trying simple blob approach');
+              // Create a simple blob with WAV MIME type as fallback
+              try {
+                const response = await fetch(dataUrl);
+                const originalBlob = await response.blob();
+                const wavBlob = new Blob([originalBlob], { type: 'audio/wav' });
+                downloadUrl = URL.createObjectURL(wavBlob);
+                fileExtension = '.wav';
+                console.log('Created WAV blob from original data');
+              } catch (blobError) {
+                console.log('Blob creation failed, using original format');
+                // Determine original file extension
+                if (mimeType.includes('mp4')) fileExtension = '.mp4';
+                else if (mimeType.includes('webm')) fileExtension = '.webm';
+                else if (mimeType.includes('wav')) fileExtension = '.wav';
+                else if (mimeType.includes('ogg')) fileExtension = '.ogg';
+                else fileExtension = '.audio';
+              }
             }
           } catch (conversionError) {
-            console.log('Conversion failed, using original format:', conversionError);
-            // Determine original file extension
+            console.log('Audio conversion failed:', conversionError);
+            // Determine original file extension as fallback
             if (mimeType.includes('mp4')) fileExtension = '.mp4';
             else if (mimeType.includes('webm')) fileExtension = '.webm';
             else if (mimeType.includes('wav')) fileExtension = '.wav';
             else if (mimeType.includes('ogg')) fileExtension = '.ogg';
+            else fileExtension = '.audio';
           }
+        } else {
+          console.log('AudioContext not available, using original format');
+          // Determine file extension from MIME type
+          if (mimeType.includes('mp4')) fileExtension = '.mp4';
+          else if (mimeType.includes('webm')) fileExtension = '.webm';
+          else if (mimeType.includes('wav')) fileExtension = '.wav';
+          else if (mimeType.includes('ogg')) fileExtension = '.ogg';
+          else fileExtension = '.audio';
         }
       }
       
