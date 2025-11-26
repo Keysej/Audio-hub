@@ -58,12 +58,18 @@ async function getTodaysTheme() {
 
 // Get sound drops from shared API with localStorage fallback
 async function getSoundDrops() {
+  // Always start with localStorage for immediate display
+  const localData = getLocalBackup();
+  console.log('📱 Starting with localStorage data:', localData.length, 'drops');
+  
   // Show loading indicator
   showLoadingIndicator('Loading sounds from other users...');
   
   try {
     console.log('Fetching sound drops from API...');
-    const response = await fetch('/api/sound-drops');
+    const response = await fetch('/api/sound-drops', { 
+      timeout: 5000 // 5 second timeout
+    });
     console.log('API response status:', response.status);
     
     if (response.ok) {
@@ -79,23 +85,28 @@ async function getSoundDrops() {
       const todayDrops = data.filter(drop => drop.timestamp >= todayMidnightMs);
       console.log(`Filtered to ${todayDrops.length} drops from today (since ${todayMidnight.toLocaleString()})`);
       
-      // API data is the source of truth - update localStorage to match
-      localStorage.setItem('soundDropsBackup', JSON.stringify(todayDrops));
-      
-      // Also merge with any local-only pending uploads
+      // Merge API data with local data (don't overwrite localStorage completely)
       const localBackup = getLocalBackup();
+      
+      // Find local-only drops that aren't in API response
       const localOnlyDrops = localBackup.filter(localDrop => 
         !todayDrops.some(apiDrop => apiDrop.id === localDrop.id)
       );
       
-      if (localOnlyDrops.length > 0) {
-        console.log('📤 Found', localOnlyDrops.length, 'local-only drops (pending upload)');
-        const mergedData = [...todayDrops, ...localOnlyDrops].sort((a, b) => b.timestamp - a.timestamp);
-        return mergedData;
-      }
+      // Merge API drops with local-only drops
+      const mergedData = [...todayDrops, ...localOnlyDrops].sort((a, b) => b.timestamp - a.timestamp);
+      
+      // Update localStorage with merged data (preserves local-only drops)
+      localStorage.setItem('soundDropsBackup', JSON.stringify(mergedData));
+      
+      console.log('✅ Merged data:', {
+        fromAPI: todayDrops.length,
+        localOnly: localOnlyDrops.length,
+        total: mergedData.length
+      });
       
       hideLoadingIndicator();
-      return todayDrops;
+      return mergedData;
     } else {
       const errorText = await response.text();
       console.warn('⚠️ API FAILED:', response.status, errorText);
@@ -110,15 +121,13 @@ async function getSoundDrops() {
         return backupData;
       }
       
-      // Show user-friendly error message
-      showErrorMessage('Main server unavailable. Trying backup sharing service to connect you with other users...');
-      
-      // Fallback to localStorage but show warning
-      console.log('📱 Using localStorage fallback (browsers may show different data)');
+      // PRIORITIZE LOCAL DATA - don't lose user's sounds!
+      console.log('📱 API failed - using localStorage (your sounds are safe!)');
       const localData = getLocalBackup();
       
-      // Show user that they're in offline mode
-      if (localData.length === 0) {
+      if (localData.length > 0) {
+        showErrorMessage(`📱 Offline mode: Showing your ${localData.length} saved sounds. Server will sync when available.`, 'info');
+      } else {
         console.log('💡 No local data - showing welcome message');
         showWelcomeMessage();
       }
@@ -129,22 +138,18 @@ async function getSoundDrops() {
   } catch (error) {
     console.error('🚨 API ERROR:', error);
     
-    // Try backup sharing service
-    console.log('🔄 Trying backup sharing service...');
-    const backupData = await tryBackupService();
-    if (backupData && backupData.length > 0) {
-      console.log('✅ Got data from backup service:', backupData.length, 'drops');
-      showErrorMessage('Connected via backup service! You can see sounds from other users on this device.', 'success');
-      hideLoadingIndicator();
-      return backupData;
+    // PRIORITIZE LOCAL DATA - network errors shouldn't lose user sounds
+    console.log('📱 Network error - using localStorage (your sounds are safe!)');
+    const localData = getLocalBackup();
+    
+    if (localData.length > 0) {
+      showErrorMessage(`📱 Network error: Showing your ${localData.length} saved sounds. Will sync when connection is restored.`, 'warning');
+    } else {
+      showErrorMessage('Network connection failed. You can still record sounds - they will sync when connection is restored.', 'warning');
     }
     
-    // Show user-friendly error message
-    showErrorMessage('Network connection failed. Trying backup sharing service to connect you with other users...');
-    
-    console.log('📱 Using localStorage fallback due to network error');
     hideLoadingIndicator();
-    return getLocalBackup();
+    return localData;
   }
 }
 
@@ -1378,16 +1383,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateCountdown();
   setInterval(updateCountdown, 1000);
   
-  // Always show local backup first for immediate loading, plus show welcome message for new users
+  // ALWAYS show local data first for immediate loading - don't wait for API
   const localData = getLocalBackup();
   const isFirstVisit = !localStorage.getItem('hasVisitedBefore');
   
-  if (localData.length > 0) {
-    console.log('Loading', localData.length, 'drops from localStorage for immediate display');
-    await renderSoundDropsFromData(localData);
-    await updateStatsFromData(localData);
-  } else if (isFirstVisit) {
-    // Show welcome message for first-time visitors
+  console.log('🚀 IMMEDIATE LOAD: Displaying', localData.length, 'sounds from localStorage');
+  await renderSoundDropsFromData(localData);
+  await updateStatsFromData(localData);
+  
+  if (localData.length === 0 && isFirstVisit) {
+    // Show welcome message for first-time visitors with no data
     showWelcomeMessage();
   }
   
@@ -1405,10 +1410,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('API status check failed:', error);
   }
   
-  // Then try to get fresh data from API and merge
-  const freshData = await getSoundDrops();
-  await renderSoundDropsFromData(freshData);
-  await updateStatsFromData(freshData);
+  // Then try to get fresh data from API and merge (but don't block the UI)
+  try {
+    const freshData = await getSoundDrops();
+    // Only re-render if we got different data
+    if (JSON.stringify(freshData) !== JSON.stringify(localData)) {
+      console.log('🔄 API returned different data - updating display');
+      await renderSoundDropsFromData(freshData);
+      await updateStatsFromData(freshData);
+    } else {
+      console.log('✅ API data matches local data - no update needed');
+    }
+  } catch (error) {
+    console.log('🚨 API fetch failed during initialization, but local data is already displayed');
+  }
   
   // Event listeners
   document.getElementById('drop-sound-btn').addEventListener('click', showRecordingSection);

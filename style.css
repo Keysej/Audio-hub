@@ -1147,6 +1147,24 @@ body {
   text-align: center;
 }
 
+.error-message.info {
+  background: #d1ecf1;
+  color: #0c5460;
+  border-color: #bee5eb;
+}
+
+.error-message.warning {
+  background: #fff3cd;
+  color: #856404;
+  border-color: #ffeaa7;
+}
+
+.error-message.success {
+  background: #d4edda;
+  color: #155724;
+  border-color: #c3e6cb;
+}
+
 /* Success message */
 .success-message {
   position: fixed;
