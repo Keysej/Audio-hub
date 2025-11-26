@@ -1031,7 +1031,8 @@ def create_sound_drop():
             'context': data.get('context', ''),
             'type': data.get('type', 'recorded'),
             'filename': data.get('filename', f"recording_{int(datetime.datetime.now().timestamp())}"),
-            'discussions': []
+            'discussions': [],
+            'applauds': 0
         }
         
         # Load existing drops and add new one
@@ -1046,6 +1047,47 @@ def create_sound_drop():
             })
         else:
             return jsonify({'error': 'Failed to save sound drop'}), 500
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sound-drops/<int:drop_id>/applaud', methods=['POST'])
+def toggle_applaud(drop_id):
+    try:
+        data = request.get_json()
+        applaud = data.get('applaud', True)
+        
+        # Load existing drops
+        drops = load_sound_drops()
+        
+        # Find the target drop
+        target_drop = None
+        for drop in drops:
+            if drop['id'] == drop_id:
+                target_drop = drop
+                break
+        
+        if not target_drop:
+            return jsonify({'error': 'Sound drop not found'}), 404
+        
+        # Initialize applauds if not exists
+        if 'applauds' not in target_drop:
+            target_drop['applauds'] = 0
+        
+        # Update applaud count
+        if applaud:
+            target_drop['applauds'] += 1
+        else:
+            target_drop['applauds'] = max(0, target_drop['applauds'] - 1)
+        
+        # Save back to storage
+        if save_sound_drops(drops):
+            return jsonify({
+                'message': 'Applaud updated successfully!',
+                'applauds': target_drop['applauds']
+            })
+        else:
+            return jsonify({'error': 'Failed to save applaud'}), 500
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500

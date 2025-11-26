@@ -531,6 +531,36 @@ body {
   margin-top: 15px;
 }
 
+.applaud-btn {
+  background: none;
+  border: 1px solid #e74c3c;
+  color: #e74c3c;
+  padding: 8px 15px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: all 0.3s ease;
+  margin-right: 8px;
+}
+
+.applaud-btn:hover {
+  background: #e74c3c;
+  color: white;
+  transform: translateY(-1px);
+}
+
+.applaud-btn.applauded {
+  background: #27ae60;
+  border-color: #27ae60;
+  color: white;
+  box-shadow: 0 0 10px rgba(39, 174, 96, 0.3);
+}
+
+.applaud-btn.applauded:hover {
+  background: #229954;
+  border-color: #229954;
+}
+
 .discuss-btn, .download-btn {
   background: none;
   border: 1px solid #e0e6ed;

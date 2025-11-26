@@ -317,7 +317,8 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
       context: context || '',
           type: type,
       filename: filename || `recording_${Date.now()}`,
-      discussions: []
+      discussions: [],
+      applauds: 0
     };
     
         const backup = getLocalBackup();
@@ -348,7 +349,8 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
       context: context || '',
         type: type,
       filename: filename || `recording_${Date.now()}`,
-      discussions: []
+      discussions: [],
+      applauds: 0
     };
     
       const backup = getLocalBackup();
@@ -385,6 +387,10 @@ function renderSoundDropsFromData(drops, filter = 'all') {
   container.innerHTML = '';
   
   filteredDrops.forEach(drop => {
+    // Check if user has applauded this drop
+    const hasApplauded = localStorage.getItem(`applaud_${drop.id}`) === 'true';
+    const applaudClass = hasApplauded ? 'applauded' : '';
+    
     const dropEl = document.createElement('div');
     dropEl.className = 'sound-drop';
     dropEl.innerHTML = `
@@ -406,6 +412,9 @@ function renderSoundDropsFromData(drops, filter = 'all') {
       }
       ${drop.context ? `<div class="drop-context">"${drop.context}"</div>` : ''}
       <div class="drop-actions">
+        <button class="applaud-btn ${applaudClass}" onclick="toggleApplaud('${drop.id}')" data-drop-id="${drop.id}">
+          <i class="fa-solid fa-hands-clapping"></i> <span class="applaud-count">${drop.applauds || 0}</span>
+        </button>
         <button class="discuss-btn" onclick="openDiscussion('${drop.id}')">
           <i class="fa-solid fa-comment"></i> Discuss (${drop.discussions.length})
         </button>
@@ -1093,6 +1102,83 @@ function renderComments(comments) {
   `).join('');
 }
 
+// Toggle applaud for a sound drop
+async function toggleApplaud(dropId) {
+  console.log('Toggling applaud for drop:', dropId);
+  
+  // Get current applaud state from localStorage
+  const applaudKey = `applaud_${dropId}`;
+  const hasApplauded = localStorage.getItem(applaudKey) === 'true';
+  
+  // Update localStorage
+  localStorage.setItem(applaudKey, (!hasApplauded).toString());
+  
+  // Update the drop data
+  const localDrops = getLocalBackup();
+  const dropIndex = localDrops.findIndex(d => d.id == dropId);
+  
+  if (dropIndex !== -1) {
+    // Initialize applauds if not exists
+    if (!localDrops[dropIndex].applauds) {
+      localDrops[dropIndex].applauds = 0;
+    }
+    
+    // Toggle applaud count
+    if (hasApplauded) {
+      localDrops[dropIndex].applauds = Math.max(0, localDrops[dropIndex].applauds - 1);
+      showNotification('Applaud removed', 'info');
+    } else {
+      localDrops[dropIndex].applauds += 1;
+      showNotification('👏 Applauded!', 'success');
+    }
+    
+    // Save to localStorage
+    localStorage.setItem('soundDropsBackup', JSON.stringify(localDrops));
+    
+    // Update UI immediately
+    const applaudBtn = document.querySelector(`button[data-drop-id="${dropId}"]`);
+    if (applaudBtn) {
+      const countSpan = applaudBtn.querySelector('.applaud-count');
+      if (countSpan) {
+        countSpan.textContent = localDrops[dropIndex].applauds;
+      }
+      
+      // Visual feedback
+      applaudBtn.style.transform = 'scale(1.2)';
+      setTimeout(() => {
+        applaudBtn.style.transform = 'scale(1)';
+      }, 150);
+      
+      // Update button style based on applaud state
+      if (!hasApplauded) {
+        applaudBtn.classList.add('applauded');
+      } else {
+        applaudBtn.classList.remove('applauded');
+      }
+    }
+    
+    // Update stats
+    updateStatsFromData(localDrops);
+    
+    // Try to sync with API in background
+    try {
+      const response = await fetch(`/api/sound-drops/${dropId}/applaud`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ applaud: !hasApplauded })
+      });
+      
+      if (response.ok) {
+        console.log('Applaud synced with API');
+      } else {
+        console.log('API applaud sync failed, but saved locally');
+      }
+    } catch (error) {
+      console.log('API applaud sync failed, but saved locally:', error.message);
+    }
+  }
+}
+
 // Add comment to a sound drop
 async function addComment(dropId) {
   const textarea = document.getElementById(`new-comment-${dropId}`);
@@ -1247,6 +1333,19 @@ function cleanupOldData() {
       if (validDrops.length !== drops.length) {
         console.log(`Startup cleanup: Removed ${drops.length - validDrops.length} old drops from localStorage`);
         localStorage.setItem('soundDropsBackup', JSON.stringify(validDrops));
+        
+        // Clean up applaud data for removed sounds
+        const validDropIds = new Set(validDrops.map(drop => drop.id));
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('applaud_')) {
+            const dropId = key.replace('applaud_', '');
+            if (!validDropIds.has(parseInt(dropId))) {
+              localStorage.removeItem(key);
+              console.log(`Cleaned up applaud data for removed sound: ${dropId}`);
+            }
+          }
+        }
       }
       
       // If no valid drops remain, clear localStorage completely
@@ -1594,7 +1693,8 @@ async function saveLinkDrop(link, context) {
         context: context || '',
         type: 'link',
         filename: `link_${Date.now()}`,
-        discussions: []
+        discussions: [],
+        applauds: 0
       };
       
       const backup = getLocalBackup();
