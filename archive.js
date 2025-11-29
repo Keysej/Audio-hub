@@ -97,22 +97,22 @@ function renderThemeContent(date, theme) {
       <p class="theme-description">${theme.description}</p>
       
       <div class="ephemeral-notice">
-        <h3>⏰ About Sound Ephemerality</h3>
-        <p>Sounds shared on this day have disappeared as they only last 24 hours. This archive preserves the theme that inspired the community's creative audio sharing.</p>
-        <p>Each theme was designed to spark different types of sonic exploration and reflection.</p>
+        <h3>⏰ The Beauty of Ephemeral Audio</h3>
+        <p>Like morning mist, the sounds shared on this day have gracefully vanished after their 24-hour lifespan. What remains is the creative spark that ignited our community's sonic imagination.</p>
+        <p>Each theme was crafted to unlock different dimensions of auditory discovery and personal reflection.</p>
       </div>
     </div>
     
     <div class="theme-inspiration">
-      <h3>💡 What This Theme Inspired</h3>
-      <p>This theme encouraged users to explore and share sounds related to <strong>${theme.title.toLowerCase()}</strong>. The community used this prompt to discover, record, and discuss audio that connected to this concept.</p>
+      <h3>💡 The Creative Challenge</h3>
+      <p>This theme invited our audio adventurers to dive deep into <strong>${theme.title.toLowerCase()}</strong>. It became a lens through which the community discovered, captured, and celebrated the sonic textures of their world.</p>
       
       <div class="theme-reflection">
-        <h4>🤔 Reflection Questions</h4>
+        <h4>🤔 Your Sonic Journey</h4>
         <ul>
-          <li>What sounds would you have shared for this theme?</li>
-          <li>How does this theme relate to your daily audio environment?</li>
-          <li>What memories or emotions does this theme evoke?</li>
+          <li>What hidden audio gems would you have unearthed for this theme?</li>
+          <li>How does this concept weave through your everyday soundscape?</li>
+          <li>What memories or feelings does this theme awaken in you?</li>
         </ul>
       </div>
     </div>
@@ -182,7 +182,7 @@ function renderThemeTimeline(dailyThemes) {
       </div>
       <div class="timeline-theme">
         <h4>${day.theme.title}</h4>
-        <p>Theme available (sounds were ephemeral)</p>
+        <p>Creative spark preserved (sounds danced away)</p>
       </div>
     </div>
   `).join('');
