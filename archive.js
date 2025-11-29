@@ -70,99 +70,20 @@ async function loadArchiveForDate() {
   content.innerHTML = `
     <div class="loading-archive">
       <div class="loading-spinner"></div>
-      <p>Loading archive for ${date.toLocaleDateString()}...</p>
+      <p>Loading theme for ${date.toLocaleDateString()}...</p>
     </div>
   `;
   
-  try {
-    // Try to get archived data from API
-    const sounds = await getArchivedSounds(selectedDate);
-    
-    // Render archive content
-    renderArchiveContent(date, theme, sounds);
-    
-  } catch (error) {
-    console.error('Failed to load archive:', error);
-    content.innerHTML = `
-      <div class="archive-error">
-        <h3>📭 No Archive Data</h3>
-        <p>No archived sounds found for ${date.toLocaleDateString()}.</p>
-        <p>This might be because:</p>
-        <ul>
-          <li>No sounds were recorded on this date</li>
-          <li>The archive system wasn't active yet</li>
-          <li>Data hasn't been archived from the research database</li>
-        </ul>
-      </div>
-    `;
-  }
+  // Always render theme content (sounds disappear after 24 hours anyway)
+  renderThemeContent(date, theme);
 }
 
-// Get archived sounds for a specific date
-async function getArchivedSounds(dateString) {
-  try {
-    // Try API first
-    const response = await fetch(`/api/archive/${dateString}`);
-    if (response.ok) {
-      const data = await response.json();
-      return data.sounds || [];
-    }
-  } catch (error) {
-    console.log('API archive not available, checking localStorage');
-  }
-  
-  // Fallback to localStorage (limited to recent data)
-  const backup = localStorage.getItem('soundDropsBackup');
-  if (backup) {
-    const allSounds = JSON.parse(backup);
-    const targetDate = new Date(dateString);
-    const startOfDay = new Date(targetDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(targetDate);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    return allSounds.filter(sound => {
-      const soundDate = new Date(sound.timestamp);
-      return soundDate >= startOfDay && soundDate <= endOfDay;
-    });
-  }
-  
-  return [];
-}
+// Themes are permanent, sounds are ephemeral (disappear after 24 hours)
+// No need to fetch archived sounds since they don't persist
 
-// Render archive content
-function renderArchiveContent(date, theme, sounds) {
+// Render theme content (sounds disappear after 24 hours)
+function renderThemeContent(date, theme) {
   const content = document.getElementById('archive-content');
-  
-  const soundsHtml = sounds.length > 0 
-    ? sounds.map(sound => `
-        <div class="archived-sound">
-          <div class="sound-header">
-            <h4>Theme: ${sound.theme}</h4>
-            <span class="sound-time">${new Date(sound.timestamp).toLocaleTimeString()}</span>
-          </div>
-          <div class="sound-content">
-            <audio controls>
-              <source src="${sound.audioData}" type="audio/wav">
-              Your browser does not support audio playback.
-            </audio>
-            <p class="sound-context">"${sound.context}"</p>
-            ${sound.discussions && sound.discussions.length > 0 
-              ? `<div class="archived-discussions">
-                   <h5>💬 Discussions (${sound.discussions.length})</h5>
-                   ${sound.discussions.map(d => `
-                     <div class="archived-comment">
-                       <span class="comment-time">${new Date(d.timestamp).toLocaleTimeString()}</span>
-                       <p>${d.comment}</p>
-                     </div>
-                   `).join('')}
-                 </div>`
-              : ''
-            }
-          </div>
-        </div>
-      `).join('')
-    : '<div class="no-sounds"><h3>📭 No sounds recorded</h3><p>No one shared sounds for this theme on this day.</p></div>';
   
   content.innerHTML = `
     <div class="archive-theme-header">
@@ -174,29 +95,47 @@ function renderArchiveContent(date, theme, sounds) {
         day: 'numeric' 
       })}</p>
       <p class="theme-description">${theme.description}</p>
-      <div class="archive-stats">
-        <span class="stat">${sounds.length} sounds</span>
-        <span class="stat">${sounds.reduce((total, s) => total + (s.discussions?.length || 0), 0)} discussions</span>
+      
+      <div class="ephemeral-notice">
+        <h3>⏰ About Sound Ephemerality</h3>
+        <p>Sounds shared on this day have disappeared as they only last 24 hours. This archive preserves the theme that inspired the community's creative audio sharing.</p>
+        <p>Each theme was designed to spark different types of sonic exploration and reflection.</p>
       </div>
     </div>
     
-    <div class="archived-sounds">
-      <h3>🎧 Recorded Sounds</h3>
-      ${soundsHtml}
+    <div class="theme-inspiration">
+      <h3>💡 What This Theme Inspired</h3>
+      <p>This theme encouraged users to explore and share sounds related to <strong>${theme.title.toLowerCase()}</strong>. The community used this prompt to discover, record, and discuss audio that connected to this concept.</p>
+      
+      <div class="theme-reflection">
+        <h4>🤔 Reflection Questions</h4>
+        <ul>
+          <li>What sounds would you have shared for this theme?</li>
+          <li>How does this theme relate to your daily audio environment?</li>
+          <li>What memories or emotions does this theme evoke?</li>
+        </ul>
+      </div>
     </div>
   `;
 }
 
-// Load weekly summary
+// Load weekly summary (themes only, since sounds disappear)
 async function loadWeeklySummary() {
   try {
-    // Calculate stats from the last 7 days
-    const weekData = await getWeeklyData();
+    // Calculate theme data from the last 7 days
+    const weekData = getWeeklyThemeData();
     
-    document.getElementById('total-sounds').textContent = weekData.totalSounds;
-    document.getElementById('total-discussions').textContent = weekData.totalDiscussions;
-    document.getElementById('active-days').textContent = weekData.activeDays;
-    document.getElementById('favorite-theme').textContent = weekData.favoriteTheme;
+    // Update summary with theme-focused stats
+    document.getElementById('total-sounds').textContent = '-';
+    document.getElementById('total-discussions').textContent = '-';
+    document.getElementById('active-days').textContent = '7';
+    document.getElementById('favorite-theme').textContent = 'All Unique';
+    
+    // Update labels to reflect theme focus
+    document.querySelector('#total-sounds + p').textContent = 'Sounds (Ephemeral)';
+    document.querySelector('#total-discussions + p').textContent = 'Discussions (Ephemeral)';
+    document.querySelector('#active-days + p').textContent = 'Days of Themes';
+    document.querySelector('#favorite-theme + p').textContent = 'Theme Variety';
     
     // Render theme timeline
     renderThemeTimeline(weekData.dailyThemes);
@@ -208,73 +147,42 @@ async function loadWeeklySummary() {
   }
 }
 
-// Get weekly data for summary
-async function getWeeklyData() {
+// Get weekly theme data (sounds are ephemeral, themes are permanent)
+function getWeeklyThemeData() {
   const weekData = {
-    totalSounds: 0,
-    totalDiscussions: 0,
-    activeDays: 0,
-    favoriteTheme: 'None',
     dailyThemes: []
   };
   
   const today = new Date();
-  const themeCount = {};
   
-  // Check last 7 days
+  // Get themes for last 7 days
   for (let i = 1; i <= 7; i++) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
-    const dateString = date.toISOString().split('T')[0];
+    const theme = getThemeForDate(date);
     
-    try {
-      const sounds = await getArchivedSounds(dateString);
-      const theme = getThemeForDate(date);
-      
-      if (sounds.length > 0) {
-        weekData.activeDays++;
-        weekData.totalSounds += sounds.length;
-        weekData.totalDiscussions += sounds.reduce((total, s) => total + (s.discussions?.length || 0), 0);
-        
-        themeCount[theme.title] = (themeCount[theme.title] || 0) + sounds.length;
-      }
-      
-      weekData.dailyThemes.push({
-        date: date,
-        theme: theme,
-        soundCount: sounds.length
-      });
-      
-    } catch (error) {
-      weekData.dailyThemes.push({
-        date: date,
-        theme: getThemeForDate(date),
-        soundCount: 0
-      });
-    }
+    weekData.dailyThemes.push({
+      date: date,
+      theme: theme,
+      soundCount: 0 // Sounds are ephemeral, don't persist
+    });
   }
-  
-  // Find favorite theme
-  const maxTheme = Object.keys(themeCount).reduce((a, b) => 
-    themeCount[a] > themeCount[b] ? a : b, 'None'
-  );
-  weekData.favoriteTheme = maxTheme;
   
   return weekData;
 }
 
-// Render theme timeline
+// Render theme timeline (themes only, sounds are ephemeral)
 function renderThemeTimeline(dailyThemes) {
   const timeline = document.getElementById('theme-list');
   
   timeline.innerHTML = dailyThemes.reverse().map(day => `
-    <div class="timeline-item ${day.soundCount > 0 ? 'active' : 'inactive'}">
+    <div class="timeline-item active">
       <div class="timeline-date">
         ${day.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
       </div>
       <div class="timeline-theme">
         <h4>${day.theme.title}</h4>
-        <p>${day.soundCount} sound${day.soundCount !== 1 ? 's' : ''}</p>
+        <p>Theme available (sounds were ephemeral)</p>
       </div>
     </div>
   `).join('');
@@ -284,5 +192,6 @@ function renderThemeTimeline(dailyThemes) {
 function closeArchiveModal() {
   document.getElementById('archive-modal').style.display = 'none';
 }
+
 
 

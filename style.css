@@ -1514,4 +1514,59 @@ body {
   color: #7f8c8d;
   font-size: 0.9em;
 }
+
+/* Archive page styles */
+.ephemeral-notice {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.ephemeral-notice h3 {
+  color: #495057;
+  margin-bottom: 10px;
+}
+
+.theme-inspiration {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.theme-inspiration h3 {
+  color: #856404;
+  margin-bottom: 15px;
+}
+
+.theme-reflection {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #ffeaa7;
+}
+
+.theme-reflection h4 {
+  color: #856404;
+  margin-bottom: 10px;
+}
+
+.theme-reflection ul {
+  list-style-type: none;
+  padding-left: 0;
+}
+
+.theme-reflection li {
+  padding: 5px 0;
+  padding-left: 20px;
+  position: relative;
+}
+
+.theme-reflection li:before {
+  content: "💭";
+  position: absolute;
+  left: 0;
+}
   
