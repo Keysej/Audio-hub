@@ -98,8 +98,7 @@ def load_sound_drops():
                 # Convert MongoDB _id to string id for consistency
                 for drop in data:
                     if '_id' in drop:
-                        drop['id'] = str(drop['_id'])
-                        del drop['_id']
+                        del drop['_id']  # Remove MongoDB _id, keep the 'id' field
                 
                 print(f"MongoDB: Loaded {len(data)} active sounds")
                 
@@ -173,23 +172,20 @@ def save_sound_drops(drops):
             try:
                 collection = research_db.active_sounds
                 
-                # Clear existing active sounds and insert new ones
-                collection.delete_many({'archived': {'$ne': True}})
-                
                 if drops:
-                    # Prepare drops for MongoDB (ensure they have proper IDs)
-                    mongo_drops = []
+                    # Use upsert to update existing or insert new drops
                     for drop in drops:
                         mongo_drop = drop.copy()
-                        # Use the existing ID or create one
-                        if 'id' in mongo_drop:
-                            mongo_drop['_id'] = mongo_drop['id']
-                            del mongo_drop['id']
-                        mongo_drops.append(mongo_drop)
-                    
-                    collection.insert_many(mongo_drops)
+                        drop_id = mongo_drop['id']
+                        
+                        # Use upsert to avoid duplicates
+                        collection.replace_one(
+                            {'id': drop_id},  # Find by id field
+                            mongo_drop,       # Replace with full document
+                            upsert=True       # Insert if not exists
+                        )
                 
-                print(f"MongoDB: Saved {len(drops)} sound drops")
+                print(f"MongoDB: Upserted {len(drops)} sound drops")
                 return True
                 
             except Exception as e:
