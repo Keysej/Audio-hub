@@ -27,8 +27,11 @@ def datetime_filter(timestamp, format='%Y-%m-%d %H:%M'):
     except:
         return 'Unknown'
 
-# File-based storage for Vercel serverless environment
+# File-based storage for Vercel serverless environment (fallback only)
 STORAGE_FILE = '/tmp/sound_drops.json'
+
+# Use MongoDB for primary storage on Vercel (file storage is not persistent)
+USE_MONGODB_PRIMARY = True
 
 # MongoDB Configuration for Research Data Archive
 # Replace with your actual MongoDB password
@@ -81,8 +84,54 @@ def archive_to_research_db(drop_data):
     return True
 
 def load_sound_drops():
-    """Load sound drops from file storage - returns only 24-hour data for main user interface"""
+    """Load sound drops - uses MongoDB on Vercel, file storage as fallback"""
     try:
+        # Try MongoDB first (primary storage on Vercel)
+        if USE_MONGODB_PRIMARY and init_mongodb():
+            try:
+                collection = research_db.active_sounds
+                
+                # Get all active sounds (not archived)
+                cursor = collection.find({'archived': {'$ne': True}})
+                data = list(cursor)
+                
+                # Convert MongoDB _id to string id for consistency
+                for drop in data:
+                    if '_id' in drop:
+                        drop['id'] = str(drop['_id'])
+                        del drop['_id']
+                
+                print(f"MongoDB: Loaded {len(data)} active sounds")
+                
+                # Archive drops older than 7 days to research database
+                now = datetime.datetime.now().timestamp() * 1000
+                seven_days_ms = 7 * 24 * 60 * 60 * 1000  # 7 days in milliseconds
+                expired_drops = [drop for drop in data if (now - drop['timestamp']) >= seven_days_ms]
+                
+                if expired_drops:
+                    print(f"Found {len(expired_drops)} expired drops (>7 days) to archive")
+                    for drop in expired_drops:
+                        # Mark as archived in active collection
+                        collection.update_one(
+                            {'id': drop['id']}, 
+                            {'$set': {'archived': True, 'archived_at': now}}
+                        )
+                        # Also save to research collection
+                        archive_to_research_db(drop)
+                    
+                    # Remove expired drops from returned data
+                    data = [drop for drop in data if (now - drop['timestamp']) < seven_days_ms]
+                
+                # Return sounds from the last 30 hours to account for timezone differences
+                thirty_hours_ms = 30 * 60 * 60 * 1000  # 30 hours in milliseconds
+                valid_drops = [drop for drop in data if (now - drop['timestamp']) < thirty_hours_ms]
+                print(f"MongoDB: Returning {len(valid_drops)} drops from last 30 hours")
+                return valid_drops
+                
+            except Exception as e:
+                print(f"MongoDB load failed, falling back to file storage: {e}")
+        
+        # Fallback to file storage
         if os.path.exists(STORAGE_FILE):
             with open(STORAGE_FILE, 'r') as f:
                 data = json.load(f)
@@ -109,7 +158,7 @@ def load_sound_drops():
                 # Frontend will do the precise filtering based on user's local midnight
                 thirty_hours_ms = 30 * 60 * 60 * 1000  # 30 hours in milliseconds
                 valid_drops = [drop for drop in data if (now - drop['timestamp']) < thirty_hours_ms]
-                print(f"Backend: Returning {len(valid_drops)} drops from last 30 hours (frontend will filter to local midnight)")
+                print(f"File: Returning {len(valid_drops)} drops from last 30 hours (frontend will filter to local midnight)")
                 return valid_drops
         return []
     except Exception as e:
@@ -117,12 +166,41 @@ def load_sound_drops():
         return []
 
 def save_sound_drops(drops):
-    """Save sound drops to file storage"""
+    """Save sound drops - uses MongoDB on Vercel, file storage as fallback"""
     try:
+        # Try MongoDB first (primary storage on Vercel)
+        if USE_MONGODB_PRIMARY and init_mongodb():
+            try:
+                collection = research_db.active_sounds
+                
+                # Clear existing active sounds and insert new ones
+                collection.delete_many({'archived': {'$ne': True}})
+                
+                if drops:
+                    # Prepare drops for MongoDB (ensure they have proper IDs)
+                    mongo_drops = []
+                    for drop in drops:
+                        mongo_drop = drop.copy()
+                        # Use the existing ID or create one
+                        if 'id' in mongo_drop:
+                            mongo_drop['_id'] = mongo_drop['id']
+                            del mongo_drop['id']
+                        mongo_drops.append(mongo_drop)
+                    
+                    collection.insert_many(mongo_drops)
+                
+                print(f"MongoDB: Saved {len(drops)} sound drops")
+                return True
+                
+            except Exception as e:
+                print(f"MongoDB save failed, falling back to file storage: {e}")
+        
+        # Fallback to file storage
         # Ensure the directory exists
         os.makedirs(os.path.dirname(STORAGE_FILE), exist_ok=True)
         with open(STORAGE_FILE, 'w') as f:
             json.dump(drops, f)
+        print(f"File: Saved {len(drops)} sound drops to storage")
         return True
     except Exception as e:
         print(f"Error saving sound drops: {e}")
@@ -1032,7 +1110,7 @@ def create_sound_drop():
             'type': data.get('type', 'recorded'),
             'filename': data.get('filename', f"recording_{int(datetime.datetime.now().timestamp())}"),
             'discussions': [],
-            'applauds': 0
+            'applauds': []  # Initialize as empty array, not 0
         }
         
         # Load existing drops and add new one
