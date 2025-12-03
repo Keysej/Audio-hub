@@ -1421,6 +1421,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       console.log('✅ API data matches local data - no update needed');
     }
+    
+    // SYNC MECHANISM: Upload any local-only sounds to the server
+    await syncLocalSoundsToServer();
+    
+    // Show sync button if there are local-only sounds
+    checkForLocalOnlySounds();
+    
   } catch (error) {
     console.log('🚨 API fetch failed during initialization, but local data is already displayed');
   }
@@ -1430,6 +1437,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('record-btn').addEventListener('click', startRecording);
   document.getElementById('stop-btn').addEventListener('click', stopRecording);
   document.getElementById('link-btn').addEventListener('click', showLinkModal);
+  document.getElementById('sync-btn').addEventListener('click', async () => {
+    document.getElementById('sync-btn').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing...';
+    await syncLocalSoundsToServer();
+    document.getElementById('sync-btn').innerHTML = '<i class="fa-solid fa-sync"></i> Sync Local Sounds';
+  });
   
   // Filter buttons
   document.querySelectorAll('.filter-tag').forEach(btn => {
@@ -1636,6 +1648,111 @@ async function showDemoContent() {
 // Show link modal
 function showLinkModal() {
   document.getElementById('link-modal').style.display = 'flex';
+}
+
+// Check if there are local-only sounds and show sync button
+async function checkForLocalOnlySounds() {
+  try {
+    const localSounds = getLocalBackup();
+    if (localSounds.length === 0) {
+      document.getElementById('sync-btn').style.display = 'none';
+      return;
+    }
+    
+    const response = await fetch('/api/sound-drops');
+    if (!response.ok) {
+      document.getElementById('sync-btn').style.display = 'none';
+      return;
+    }
+    
+    const serverSounds = await response.json();
+    const serverIds = new Set(serverSounds.map(s => s.id));
+    const localOnlySounds = localSounds.filter(sound => !serverIds.has(sound.id));
+    
+    if (localOnlySounds.length > 0) {
+      document.getElementById('sync-btn').style.display = 'inline-block';
+      document.getElementById('sync-btn').title = `Sync ${localOnlySounds.length} local sounds to server`;
+    } else {
+      document.getElementById('sync-btn').style.display = 'none';
+    }
+  } catch (error) {
+    document.getElementById('sync-btn').style.display = 'none';
+  }
+}
+
+// SYNC MECHANISM: Upload local-only sounds to server
+async function syncLocalSoundsToServer() {
+  try {
+    console.log('🔄 Checking for local sounds to sync to server...');
+    
+    // Get local sounds
+    const localSounds = getLocalBackup();
+    if (localSounds.length === 0) {
+      console.log('📱 No local sounds to sync');
+      return;
+    }
+    
+    // Check what's already on the server
+    const response = await fetch('/api/sound-drops');
+    if (!response.ok) {
+      console.log('⚠️ Cannot sync - server not available');
+      return;
+    }
+    
+    const serverSounds = await response.json();
+    const serverIds = new Set(serverSounds.map(s => s.id));
+    
+    // Find sounds that exist locally but not on server
+    const soundsToSync = localSounds.filter(sound => !serverIds.has(sound.id));
+    
+    if (soundsToSync.length === 0) {
+      console.log('✅ All local sounds already synced to server');
+      return;
+    }
+    
+    console.log(`🔄 Syncing ${soundsToSync.length} local sounds to server...`);
+    
+    // Upload each local sound to the server
+    let syncedCount = 0;
+    for (const sound of soundsToSync) {
+      try {
+        const syncResponse = await fetch('/api/sound-drops', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            audioData: sound.audioData,
+            context: sound.context || '',
+            type: sound.type || 'recorded',
+            filename: sound.filename || `recording_${sound.timestamp}`
+          })
+        });
+        
+        if (syncResponse.ok) {
+          syncedCount++;
+          console.log(`✅ Synced sound ${sound.id} to server`);
+        } else {
+          console.warn(`⚠️ Failed to sync sound ${sound.id}:`, syncResponse.status);
+        }
+      } catch (error) {
+        console.warn(`⚠️ Error syncing sound ${sound.id}:`, error);
+      }
+    }
+    
+    if (syncedCount > 0) {
+      console.log(`🎉 Successfully synced ${syncedCount}/${soundsToSync.length} sounds to server!`);
+      showNotification(`Synced ${syncedCount} sounds to server - now visible on all devices!`, 'success');
+      
+      // Refresh the display to show updated data
+      const freshData = await getSoundDrops();
+      await renderSoundDropsFromData(freshData);
+      await updateStatsFromData(freshData);
+    }
+    
+  } catch (error) {
+    console.error('🚨 Sync error:', error);
+  }
 }
 
 // Close link modal
