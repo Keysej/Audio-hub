@@ -1662,13 +1662,17 @@ function showLinkModal() {
 async function checkForLocalOnlySounds() {
   try {
     const localSounds = getLocalBackup();
+    console.log('🔍 Checking sync button - Local sounds:', localSounds.length);
+    
     if (localSounds.length === 0) {
+      console.log('🔍 No local sounds - hiding sync button');
       document.getElementById('sync-btn').style.display = 'none';
       return;
     }
     
     const response = await fetch('/api/sound-drops');
     if (!response.ok) {
+      console.log('🔍 Server not available - hiding sync button');
       document.getElementById('sync-btn').style.display = 'none';
       return;
     }
@@ -1677,13 +1681,19 @@ async function checkForLocalOnlySounds() {
     const serverIds = new Set(serverSounds.map(s => s.id));
     const localOnlySounds = localSounds.filter(sound => !serverIds.has(sound.id));
     
+    console.log('🔍 Local-only sounds found:', localOnlySounds.length);
+    console.log('🔍 Local-only IDs:', localOnlySounds.map(s => s.id));
+    
     if (localOnlySounds.length > 0) {
+      console.log('🔍 Showing sync button for', localOnlySounds.length, 'sounds');
       document.getElementById('sync-btn').style.display = 'inline-block';
       document.getElementById('sync-btn').title = `Sync ${localOnlySounds.length} local sounds to server`;
     } else {
+      console.log('🔍 All sounds synced - hiding sync button');
       document.getElementById('sync-btn').style.display = 'none';
     }
   } catch (error) {
+    console.error('🔍 Error checking sync button:', error);
     document.getElementById('sync-btn').style.display = 'none';
   }
 }
@@ -1695,6 +1705,9 @@ async function syncLocalSoundsToServer() {
     
     // Get local sounds
     const localSounds = getLocalBackup();
+    console.log('📱 Local sounds found:', localSounds.length);
+    console.log('📱 Local sound IDs:', localSounds.map(s => s.id));
+    
     if (localSounds.length === 0) {
       console.log('📱 No local sounds to sync');
       return;
@@ -1703,15 +1716,24 @@ async function syncLocalSoundsToServer() {
     // Check what's already on the server
     const response = await fetch('/api/sound-drops');
     if (!response.ok) {
-      console.log('⚠️ Cannot sync - server not available');
+      console.log('⚠️ Cannot sync - server not available:', response.status);
       return;
     }
     
     const serverSounds = await response.json();
+    console.log('🌐 Server sounds found:', serverSounds.length);
+    console.log('🌐 Server sound IDs:', serverSounds.map(s => s.id));
+    
     const serverIds = new Set(serverSounds.map(s => s.id));
     
     // Find sounds that exist locally but not on server
-    const soundsToSync = localSounds.filter(sound => !serverIds.has(sound.id));
+    const soundsToSync = localSounds.filter(sound => {
+      const needsSync = !serverIds.has(sound.id);
+      console.log(`🔍 Sound ${sound.id}: ${needsSync ? 'NEEDS SYNC' : 'already on server'}`);
+      return needsSync;
+    });
+    
+    console.log(`🎯 Sounds to sync: ${soundsToSync.length}/${localSounds.length}`);
     
     if (soundsToSync.length === 0) {
       console.log('✅ All local sounds already synced to server');
