@@ -66,11 +66,11 @@ async function getSoundDrops() {
   showLoadingIndicator('Loading sounds from other users...');
   
   try {
-    console.log('Fetching sound drops from API...');
+    console.log('🌐 Fetching sound drops from API...');
     const response = await fetch('/api/sound-drops', { 
       timeout: 5000 // 5 second timeout
     });
-    console.log('API response status:', response.status);
+    console.log('📡 API response status:', response.status, 'URL:', response.url);
     
     if (response.ok) {
       const data = await response.json();
@@ -1413,6 +1413,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Then try to get fresh data from API and merge (but don't block the UI)
   try {
     const freshData = await getSoundDrops();
+    console.log('📊 Data comparison:', {
+      localCount: localData.length,
+      apiCount: freshData.length,
+      localIds: localData.map(d => d.id),
+      apiIds: freshData.map(d => d.id)
+    });
+    
     // Only re-render if we got different data
     if (JSON.stringify(freshData) !== JSON.stringify(localData)) {
       console.log('🔄 API returned different data - updating display');
@@ -1429,7 +1436,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     checkForLocalOnlySounds();
     
   } catch (error) {
-    console.log('🚨 API fetch failed during initialization, but local data is already displayed');
+    console.error('🚨 API fetch failed during initialization:', error);
+    console.log('📱 But local data is already displayed');
   }
   
   // Event listeners
