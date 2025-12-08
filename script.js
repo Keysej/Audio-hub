@@ -1687,7 +1687,9 @@ async function checkForLocalOnlySounds() {
     
     const serverSounds = await response.json();
     const serverIds = new Set(serverSounds.map(s => s.id));
-    const localOnlySounds = localSounds.filter(sound => !serverIds.has(sound.id));
+    const localOnlySounds = localSounds.filter(sound => 
+      !serverIds.has(sound.id) && !sound.synced
+    );
     
     console.log('🔍 Local-only sounds found:', localOnlySounds.length);
     console.log('🔍 Local-only IDs:', localOnlySounds.map(s => s.id));
@@ -1745,10 +1747,18 @@ async function syncLocalSoundsToServer(forceSync = false) {
     
     const serverIds = new Set(serverSounds.map(s => s.id));
     
-    // Find sounds that exist locally but not on server
+    // Find sounds that exist locally but not on server AND are not already marked as synced
     const soundsToSync = localSounds.filter(sound => {
-      const needsSync = !serverIds.has(sound.id);
-      console.log(`🔍 Sound ${sound.id}: ${needsSync ? 'NEEDS SYNC' : 'already on server'}`);
+      const alreadyOnServer = serverIds.has(sound.id);
+      const alreadyMarkedSynced = sound.synced === true;
+      const needsSync = !alreadyOnServer && !alreadyMarkedSynced;
+      
+      console.log(`🔍 Sound ${sound.id}: ${
+        alreadyOnServer ? 'already on server' : 
+        alreadyMarkedSynced ? 'marked as synced' : 
+        'NEEDS SYNC'
+      }`);
+      
       return needsSync;
     });
     
@@ -1798,12 +1808,15 @@ async function syncLocalSoundsToServer(forceSync = false) {
       console.log(`🎉 Successfully synced ${syncedCount}/${soundsToSync.length} sounds to server!`);
       showNotification(`Synced ${syncedCount} sounds to server - now visible on all devices!`, 'success');
       
-      // Clean up localStorage - remove synced sounds to prevent re-syncing
-      const remainingLocalSounds = localSounds.filter(sound => 
-        !soundsToSync.some(synced => synced.id === sound.id)
-      );
-      localStorage.setItem('soundDropsBackup', JSON.stringify(remainingLocalSounds));
-      console.log(`🧹 Cleaned localStorage - removed ${syncedCount} synced sounds`);
+      // Mark synced sounds to prevent re-syncing (but keep them in localStorage for display)
+      const updatedLocalSounds = localSounds.map(sound => {
+        if (soundsToSync.some(synced => synced.id === sound.id)) {
+          return { ...sound, synced: true }; // Mark as synced
+        }
+        return sound;
+      });
+      localStorage.setItem('soundDropsBackup', JSON.stringify(updatedLocalSounds));
+      console.log(`🏷️ Marked ${syncedCount} sounds as synced in localStorage`);
       
       // Refresh the display to show updated data
       const freshData = await getSoundDrops();
