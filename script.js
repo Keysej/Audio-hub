@@ -1771,18 +1771,22 @@ async function syncLocalSoundsToServer(forceSync = false) {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
+            id: sound.id, // Send the original ID to prevent server from creating new one
             audioData: sound.audioData,
             context: sound.context || '',
             type: sound.type || 'recorded',
-            filename: sound.filename || `recording_${sound.timestamp}`
+            filename: sound.filename || `recording_${sound.timestamp}`,
+            timestamp: sound.timestamp // Also send original timestamp
           })
         });
         
         if (syncResponse.ok) {
+          const result = await syncResponse.json();
           syncedCount++;
-          console.log(`✅ Synced sound ${sound.id} to server`);
+          console.log(`✅ Synced sound ${sound.id} to server:`, result.message);
         } else {
-          console.warn(`⚠️ Failed to sync sound ${sound.id}:`, syncResponse.status);
+          const errorText = await syncResponse.text();
+          console.warn(`⚠️ Failed to sync sound ${sound.id}:`, syncResponse.status, errorText);
         }
       } catch (error) {
         console.warn(`⚠️ Error syncing sound ${sound.id}:`, error);
@@ -1793,6 +1797,13 @@ async function syncLocalSoundsToServer(forceSync = false) {
       lastSyncTime = Date.now(); // Update last sync time
       console.log(`🎉 Successfully synced ${syncedCount}/${soundsToSync.length} sounds to server!`);
       showNotification(`Synced ${syncedCount} sounds to server - now visible on all devices!`, 'success');
+      
+      // Clean up localStorage - remove synced sounds to prevent re-syncing
+      const remainingLocalSounds = localSounds.filter(sound => 
+        !soundsToSync.some(synced => synced.id === sound.id)
+      );
+      localStorage.setItem('soundDropsBackup', JSON.stringify(remainingLocalSounds));
+      console.log(`🧹 Cleaned localStorage - removed ${syncedCount} synced sounds`);
       
       // Refresh the display to show updated data
       const freshData = await getSoundDrops();

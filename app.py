@@ -1097,14 +1097,29 @@ def create_sound_drop():
         
         # Create new sound drop
         current_theme = get_current_theme()
+        # Use provided ID if available (for syncing), otherwise generate new one
+        provided_id = data.get('id')
+        provided_timestamp = data.get('timestamp')
+        
+        if provided_id and provided_timestamp:
+            # This is a sync from localStorage - use original ID and timestamp
+            drop_id = int(provided_id)
+            drop_timestamp = int(provided_timestamp)
+            print(f"📱 Syncing sound with original ID: {drop_id}")
+        else:
+            # This is a new recording - generate new ID and timestamp
+            drop_id = int(datetime.datetime.now().timestamp() * 1000)
+            drop_timestamp = int(datetime.datetime.now().timestamp() * 1000)
+            print(f"🆕 Creating new sound with ID: {drop_id}")
+        
         drop = {
-            'id': int(datetime.datetime.now().timestamp() * 1000),
-            'timestamp': int(datetime.datetime.now().timestamp() * 1000),
+            'id': drop_id,
+            'timestamp': drop_timestamp,
             'theme': current_theme['title'],
             'audioData': data['audioData'],
             'context': data.get('context', ''),
             'type': data.get('type', 'recorded'),
-            'filename': data.get('filename', f"recording_{int(datetime.datetime.now().timestamp())}"),
+            'filename': data.get('filename', f"recording_{drop_timestamp}"),
             'discussions': [],
             'applauds': []  # Initialize as empty array, not 0
         }
@@ -1112,14 +1127,24 @@ def create_sound_drop():
         # Load existing drops and check for duplicates
         drops = load_sound_drops()
         
-        # Check if a sound with this ID already exists (duplicate prevention)
-        existing_ids = {drop['id'] for drop in drops}
-        if drop['id'] in existing_ids:
-            print(f"⚠️ Duplicate sound detected - ID {drop['id']} already exists")
-            return jsonify({
-                'message': 'Sound already exists',
-                'drop': drop
-            })
+        # Enhanced duplicate prevention - check by ID, filename, and audio data
+        for existing_drop in drops:
+            # Check by ID
+            if existing_drop['id'] == drop['id']:
+                print(f"⚠️ Duplicate sound detected - ID {drop['id']} already exists")
+                return jsonify({
+                    'message': 'Sound already exists (same ID)',
+                    'drop': existing_drop
+                })
+            
+            # Check by filename (for same recording synced multiple times)
+            if (existing_drop.get('filename') == drop['filename'] and 
+                existing_drop.get('audioData') == drop['audioData']):
+                print(f"⚠️ Duplicate sound detected - same filename and audio data")
+                return jsonify({
+                    'message': 'Sound already exists (same content)',
+                    'drop': existing_drop
+                })
         
         # Add new drop
         drops.insert(0, drop)
