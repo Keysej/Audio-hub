@@ -1429,9 +1429,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.log('✅ API data matches local data - no update needed');
     }
     
-    // SYNC MECHANISM: Upload any local-only sounds to the server
-    await syncLocalSoundsToServer();
-    
     // Show sync button if there are local-only sounds
     checkForLocalOnlySounds();
     
@@ -1447,7 +1444,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('link-btn').addEventListener('click', showLinkModal);
   document.getElementById('sync-btn').addEventListener('click', async () => {
     document.getElementById('sync-btn').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing...';
-    await syncLocalSoundsToServer();
+    await syncLocalSoundsToServer(true); // Force sync when manually triggered
     document.getElementById('sync-btn').innerHTML = '<i class="fa-solid fa-sync"></i> Sync Local Sounds';
   });
   
@@ -1521,10 +1518,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   
-  // Refresh data every 10 seconds to show new drops and comments from other users in real-time
+  // Refresh data every 5 minutes to show new drops and comments from other users
   setInterval(async () => {
     try {
-      console.log('Auto-refreshing data for real-time collaboration...');
+      console.log('Auto-refreshing data for collaboration...');
       
       // Clean up old localStorage data during refresh
       cleanupOldData();
@@ -1557,7 +1554,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
       console.log('Auto-refresh failed:', error);
     }
-  }, 10 * 1000);
+  }, 5 * 60 * 1000); // 5 minutes instead of 10 seconds
+  
+  // Separate sync interval - check for local sounds to sync every 5 minutes
+  setInterval(async () => {
+    try {
+      console.log('🔄 Periodic sync check...');
+      await syncLocalSoundsToServer();
+      checkForLocalOnlySounds();
+    } catch (error) {
+      console.log('Periodic sync failed:', error);
+    }
+  }, 5 * 60 * 1000); // 5 minutes
   
   // Only show demo content if API is completely broken AND no local data exists
   // Don't show demo if we're getting empty arrays from a working API
@@ -1698,9 +1706,20 @@ async function checkForLocalOnlySounds() {
   }
 }
 
+// Track last sync time to prevent excessive syncing
+let lastSyncTime = 0;
+const SYNC_COOLDOWN = 2 * 60 * 1000; // 2 minutes between syncs
+
 // SYNC MECHANISM: Upload local-only sounds to server
-async function syncLocalSoundsToServer() {
+async function syncLocalSoundsToServer(forceSync = false) {
   try {
+    // Throttle sync calls to prevent excessive API usage
+    const now = Date.now();
+    if (!forceSync && (now - lastSyncTime) < SYNC_COOLDOWN) {
+      console.log('🔄 Sync throttled - too soon since last sync');
+      return;
+    }
+    
     console.log('🔄 Checking for local sounds to sync to server...');
     
     // Get local sounds
@@ -1771,6 +1790,7 @@ async function syncLocalSoundsToServer() {
     }
     
     if (syncedCount > 0) {
+      lastSyncTime = Date.now(); // Update last sync time
       console.log(`🎉 Successfully synced ${syncedCount}/${soundsToSync.length} sounds to server!`);
       showNotification(`Synced ${syncedCount} sounds to server - now visible on all devices!`, 'success');
       

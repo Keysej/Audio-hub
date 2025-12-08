@@ -1109,8 +1109,19 @@ def create_sound_drop():
             'applauds': []  # Initialize as empty array, not 0
         }
         
-        # Load existing drops and add new one
+        # Load existing drops and check for duplicates
         drops = load_sound_drops()
+        
+        # Check if a sound with this ID already exists (duplicate prevention)
+        existing_ids = {drop['id'] for drop in drops}
+        if drop['id'] in existing_ids:
+            print(f"⚠️ Duplicate sound detected - ID {drop['id']} already exists")
+            return jsonify({
+                'message': 'Sound already exists',
+                'drop': drop
+            })
+        
+        # Add new drop
         drops.insert(0, drop)
         
         # Save back to storage
