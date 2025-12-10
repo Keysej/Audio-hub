@@ -100,7 +100,7 @@ async function getSoundDrops() {
       const mergedData = [...todayDrops, ...localOnlyDrops].sort((a, b) => b.timestamp - a.timestamp);
       
       // Update localStorage with merged data (preserves local-only drops)
-      localStorage.setItem('soundDropsBackup', JSON.stringify(mergedData));
+      safeSetLocalStorage('soundDropsBackup', JSON.stringify(mergedData));
       
       console.log('✅ Merged data:', {
         fromAPI: todayDrops.length,
@@ -244,6 +244,41 @@ function mergeDrops(apiDrops, localDrops) {
 }
 
 // Get sound drops from localStorage backup with strict 24-hour filtering
+// Safe localStorage setter with quota handling
+function safeSetLocalStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    console.error('🚨 localStorage error:', error);
+    
+    if (error.name === 'QuotaExceededError') {
+      console.warn('🚨 Storage quota exceeded - attempting cleanup');
+      
+      // Try to free up space by removing old data
+      try {
+        const data = JSON.parse(value);
+        if (Array.isArray(data) && data.length > 5) {
+          // Keep only 5 most recent items
+          const reducedData = data.slice(0, 5);
+          localStorage.setItem(key, JSON.stringify(reducedData));
+          showErrorMessage('Storage full - kept only 5 most recent sounds', 'warning');
+          return true;
+        }
+      } catch (parseError) {
+        console.error('Could not parse data for cleanup:', parseError);
+      }
+      
+      // If cleanup didn't work, clear everything
+      localStorage.clear();
+      showErrorMessage('Storage full - cleared all local data. New sounds will be saved to server.', 'warning');
+      return false;
+    }
+    
+    return false;
+  }
+}
+
 function getLocalBackup() {
   try {
     const stored = localStorage.getItem('soundDropsBackup');
@@ -261,13 +296,21 @@ function getLocalBackup() {
     // If we filtered out any old drops, update localStorage to keep it clean
   if (validDrops.length !== drops.length) {
       console.log(`Cleaned up ${drops.length - validDrops.length} old drops from localStorage`);
-      localStorage.setItem('soundDropsBackup', JSON.stringify(validDrops));
+      safeSetLocalStorage('soundDropsBackup', JSON.stringify(validDrops));
   }
   
     console.log('Using localStorage backup:', validDrops.length, 'drops (24-hour filtered)');
   return validDrops;
   } catch (error) {
     console.error('Error reading localStorage backup:', error);
+    
+    // If quota exceeded, clear storage and return empty array
+    if (error.name === 'QuotaExceededError') {
+      console.warn('🚨 Storage quota exceeded - clearing localStorage');
+      localStorage.removeItem('soundDropsBackup');
+      showErrorMessage('Storage full - cleared old sounds. Your new recording will be saved.', 'warning');
+    }
+    
     return [];
   }
 }
@@ -305,7 +348,7 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
         // Add to localStorage backup immediately
         const backup = getLocalBackup();
         backup.unshift(result.drop);
-        localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
+        safeSetLocalStorage('soundDropsBackup', JSON.stringify(backup));
         
         // Also try to save to backup service for cross-device sharing
         await saveToBackupService(backup);
@@ -337,7 +380,7 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
     
         const backup = getLocalBackup();
         backup.unshift(drop);
-        localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
+        safeSetLocalStorage('soundDropsBackup', JSON.stringify(backup));
         
         // Also try to save to backup service for cross-device sharing
         await saveToBackupService(backup);
@@ -369,7 +412,7 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
     
       const backup = getLocalBackup();
       backup.unshift(drop);
-      localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
+      safeSetLocalStorage('soundDropsBackup', JSON.stringify(backup));
       
       // Also try to save to backup service for cross-device sharing
       await saveToBackupService(backup);
@@ -1147,7 +1190,7 @@ async function toggleApplaud(dropId) {
     }
     
     // Save to localStorage
-    localStorage.setItem('soundDropsBackup', JSON.stringify(localDrops));
+    safeSetLocalStorage('soundDropsBackup', JSON.stringify(localDrops));
     
     // Update UI immediately
     const applaudBtn = document.querySelector(`button[data-drop-id="${dropId}"]`);
@@ -1217,7 +1260,7 @@ async function addComment(dropId) {
   
   if (localDropIndex !== -1) {
     localDrops[localDropIndex].discussions.push(comment);
-    localStorage.setItem('soundDropsBackup', JSON.stringify(localDrops));
+    safeSetLocalStorage('soundDropsBackup', JSON.stringify(localDrops));
   
     // Update the UI immediately
   const commentsList = document.getElementById(`comments-list-${dropId}`);
@@ -1346,7 +1389,7 @@ function cleanupOldData() {
       
       if (validDrops.length !== drops.length) {
         console.log(`Startup cleanup: Removed ${drops.length - validDrops.length} old drops from localStorage`);
-        localStorage.setItem('soundDropsBackup', JSON.stringify(validDrops));
+        safeSetLocalStorage('soundDropsBackup', JSON.stringify(validDrops));
         
         // Clean up applaud data for removed sounds
         const validDropIds = new Set(validDrops.map(drop => drop.id));
@@ -1764,6 +1807,34 @@ async function testAPIConnection() {
 
 // Add to window for manual testing
 window.testAPI = testAPIConnection;
+
+// Storage usage monitor
+function checkStorageUsage() {
+  try {
+    const backup = localStorage.getItem('soundDropsBackup');
+    if (backup) {
+      const sizeInBytes = new Blob([backup]).size;
+      const sizeInMB = (sizeInBytes / (1024 * 1024)).toFixed(2);
+      const itemCount = JSON.parse(backup).length;
+      
+      console.log(`📊 Storage usage: ${sizeInMB}MB (${itemCount} sounds)`);
+      
+      // Warn if approaching 4MB (Chrome limit is ~5MB)
+      if (sizeInBytes > 4 * 1024 * 1024) {
+        console.warn('⚠️ Storage approaching limit - consider syncing to server');
+        showErrorMessage('Storage nearly full - please sync your sounds to server', 'warning');
+      }
+      
+      return { sizeInMB: parseFloat(sizeInMB), itemCount, sizeInBytes };
+    }
+  } catch (error) {
+    console.error('Error checking storage usage:', error);
+  }
+  return { sizeInMB: 0, itemCount: 0, sizeInBytes: 0 };
+}
+
+// Add to window for manual checking
+window.checkStorage = checkStorageUsage;
 const SYNC_COOLDOWN = 2 * 60 * 1000; // 2 minutes between syncs
 
 // SYNC MECHANISM: Upload local-only sounds to server
@@ -1869,7 +1940,7 @@ async function syncLocalSoundsToServer(forceSync = false) {
         }
         return sound;
       });
-      localStorage.setItem('soundDropsBackup', JSON.stringify(updatedLocalSounds));
+      safeSetLocalStorage('soundDropsBackup', JSON.stringify(updatedLocalSounds));
       console.log(`🏷️ Marked ${syncedCount} sounds as synced in localStorage`);
       
       // Refresh the display to show updated data
@@ -1933,7 +2004,7 @@ async function saveLinkDrop(link, context) {
       // Add to localStorage backup immediately
       const backup = getLocalBackup();
       backup.unshift(result.drop);
-      localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
+      safeSetLocalStorage('soundDropsBackup', JSON.stringify(backup));
       
       const freshData = await getSoundDrops();
       renderSoundDropsFromData(freshData);
@@ -1959,7 +2030,7 @@ async function saveLinkDrop(link, context) {
       
       const backup = getLocalBackup();
       backup.unshift(drop);
-      localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
+      safeSetLocalStorage('soundDropsBackup', JSON.stringify(backup));
       
       const freshData = getLocalBackup();
       renderSoundDropsFromData(freshData);
@@ -1984,7 +2055,7 @@ async function saveLinkDrop(link, context) {
     
     const backup = getLocalBackup();
     backup.unshift(drop);
-    localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
+    safeSetLocalStorage('soundDropsBackup', JSON.stringify(backup));
     
     const freshData = getLocalBackup();
     renderSoundDropsFromData(freshData);
@@ -2036,7 +2107,7 @@ async function saveCommentEdit(commentId) {
   targetComment.editedAt = Date.now();
   
   // Save to localStorage
-  localStorage.setItem('soundDropsBackup', JSON.stringify(localDrops));
+  safeSetLocalStorage('soundDropsBackup', JSON.stringify(localDrops));
   
   // Update the display immediately
   document.getElementById(`comment-text-${commentId}`).textContent = newText;
@@ -2103,7 +2174,7 @@ async function deleteComment(commentId) {
   targetDrop.discussions.splice(commentIndex, 1);
   
   // Save to localStorage
-  localStorage.setItem('soundDropsBackup', JSON.stringify(localDrops));
+  safeSetLocalStorage('soundDropsBackup', JSON.stringify(localDrops));
   
   // Remove from display immediately
   const commentElement = document.getElementById(`comment-${commentId}`);
@@ -2147,7 +2218,7 @@ async function updateCommentInStorage(drop) {
   const dropIndex = backup.findIndex(d => d.id === drop.id);
   if (dropIndex !== -1) {
     backup[dropIndex] = drop;
-    localStorage.setItem('soundDropsBackup', JSON.stringify(backup));
+    safeSetLocalStorage('soundDropsBackup', JSON.stringify(backup));
   }
 }
 
