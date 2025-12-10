@@ -67,6 +67,9 @@ async function getSoundDrops() {
   
   try {
     console.log('🌐 Fetching sound drops from API...');
+    console.log('🔍 Browser:', navigator.userAgent);
+    console.log('🔍 Current URL:', window.location.href);
+    
     const response = await fetch('/api/sound-drops', { 
       timeout: 5000 // 5 second timeout
     });
@@ -137,6 +140,12 @@ async function getSoundDrops() {
     }
   } catch (error) {
     console.error('🚨 API ERROR:', error);
+    console.error('🔍 Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      browser: navigator.userAgent
+    });
     
     // PRIORITIZE LOCAL DATA - network errors shouldn't lose user sounds
     console.log('📱 Network error - using localStorage (your sounds are safe!)');
@@ -1710,6 +1719,51 @@ async function checkForLocalOnlySounds() {
 
 // Track last sync time to prevent excessive syncing
 let lastSyncTime = 0;
+
+// Manual API test function for debugging Chrome issues
+async function testAPIConnection() {
+  console.log('🧪 MANUAL API TEST START');
+  console.log('🔍 Browser:', navigator.userAgent);
+  console.log('🔍 Current URL:', window.location.href);
+  console.log('🔍 Protocol:', window.location.protocol);
+  
+  try {
+    // Test 1: Basic fetch
+    console.log('🧪 Test 1: Basic fetch to /api/sound-drops');
+    const response1 = await fetch('/api/sound-drops');
+    console.log('✅ Basic fetch result:', response1.status, response1.statusText);
+    
+    // Test 2: With full URL
+    console.log('🧪 Test 2: Full URL fetch');
+    const fullUrl = `${window.location.origin}/api/sound-drops`;
+    console.log('🔍 Full URL:', fullUrl);
+    const response2 = await fetch(fullUrl);
+    console.log('✅ Full URL fetch result:', response2.status, response2.statusText);
+    
+    // Test 3: Check response headers
+    console.log('🧪 Test 3: Response headers');
+    console.log('📋 Headers:', [...response2.headers.entries()]);
+    
+    // Test 4: Try to get JSON
+    console.log('🧪 Test 4: Parse JSON');
+    const data = await response2.json();
+    console.log('✅ JSON data:', data.length, 'items');
+    
+    return { success: true, data };
+    
+  } catch (error) {
+    console.error('🚨 API TEST FAILED:', error);
+    console.error('🔍 Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+    return { success: false, error };
+  }
+}
+
+// Add to window for manual testing
+window.testAPI = testAPIConnection;
 const SYNC_COOLDOWN = 2 * 60 * 1000; // 2 minutes between syncs
 
 // SYNC MECHANISM: Upload local-only sounds to server
