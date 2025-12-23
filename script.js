@@ -503,19 +503,19 @@ function updateCountdown() {
   timerElement.textContent = 
     `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   
-  // Dynamic color scheme based on time remaining - WCAG AA compliant colors
+  // Dynamic color scheme - bright colors visible on purple gradient background
   if (hours >= 12) {
-    // Dark Green: 12+ hours left (safe zone) - WCAG AA compliant
-    updateCountdownColors('#2e7d32', 'rgba(46, 125, 50, 0.15)', 'rgba(46, 125, 50, 0.4)', 'rgba(46, 125, 50, 0.2)', 'fa-hourglass-start');
+    // Bright Green: 12+ hours left (safe zone) - visible on purple background
+    updateCountdownColors('#00e676', 'rgba(0, 230, 118, 0.2)', 'rgba(0, 230, 118, 0.5)', 'rgba(0, 230, 118, 0.3)', 'fa-hourglass-start');
   } else if (hours >= 6) {
-    // Dark Blue: 6-12 hours left (caution zone) - WCAG AA compliant, color-blind friendly
-    updateCountdownColors('#1565c0', 'rgba(21, 101, 192, 0.15)', 'rgba(21, 101, 192, 0.4)', 'rgba(21, 101, 192, 0.2)', 'fa-hourglass-half');
+    // Bright Cyan: 6-12 hours left (caution zone) - highly visible, color-blind friendly
+    updateCountdownColors('#00e5ff', 'rgba(0, 229, 255, 0.2)', 'rgba(0, 229, 255, 0.5)', 'rgba(0, 229, 255, 0.3)', 'fa-hourglass-half');
   } else if (hours >= 2) {
-    // Dark Orange: 2-6 hours left (warning zone) - WCAG AA compliant
-    updateCountdownColors('#e65100', 'rgba(230, 81, 0, 0.15)', 'rgba(230, 81, 0, 0.4)', 'rgba(230, 81, 0, 0.2)', 'fa-hourglass-half');
+    // Bright Orange: 2-6 hours left (warning zone) - visible and accessible
+    updateCountdownColors('#ff6d00', 'rgba(255, 109, 0, 0.2)', 'rgba(255, 109, 0, 0.5)', 'rgba(255, 109, 0, 0.3)', 'fa-hourglass-half');
   } else {
-    // Dark Red: Less than 2 hours left (critical zone) - WCAG AA compliant
-    updateCountdownColors('#c62828', 'rgba(198, 40, 40, 0.15)', 'rgba(198, 40, 40, 0.4)', 'rgba(198, 40, 40, 0.2)', 'fa-hourglass-end');
+    // Bright Red: Less than 2 hours left (critical zone) - highly visible
+    updateCountdownColors('#ff1744', 'rgba(255, 23, 68, 0.2)', 'rgba(255, 23, 68, 0.5)', 'rgba(255, 23, 68, 0.3)', 'fa-hourglass-end');
   }
 }
 
