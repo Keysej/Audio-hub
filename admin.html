@@ -155,6 +155,28 @@
     .download-btn:hover {
       background: #218838;
     }
+
+    .delete-btn {
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.9em;
+      margin-left: 10px;
+      transition: all 0.3s ease;
+    }
+
+    .delete-btn:hover {
+      background: #c82333;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+    }
+
+    .delete-btn:active {
+      transform: translateY(0);
+    }
     
     .comments-section {
       background: #e8f4fd;
@@ -251,6 +273,17 @@
         <button class="export-btn" onclick="exportData('json')">📄 Export JSON</button>
         <button class="export-btn" onclick="exportData('csv')">📊 Export CSV</button>
         <button class="export-btn" onclick="refreshData()">🔄 Refresh Data</button>
+      </div>
+
+      <!-- Admin Actions -->
+      <div class="admin-actions" style="margin: 20px 0; padding: 15px; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107;">
+        <h3 style="margin: 0 0 10px 0; color: #856404;">🛡️ Content Moderation</h3>
+        <p style="margin: 0 0 15px 0; color: #856404; font-size: 0.9em;">
+          Use the 🗑️ Delete buttons below to remove inappropriate content. Each deletion requires confirmation and cannot be undone.
+        </p>
+        <button onclick="refreshData()" class="refresh-btn" style="background: #17a2b8; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer;">
+          🔄 Refresh Data
+        </button>
       </div>
 
       <!-- Data Display -->
@@ -433,6 +466,7 @@
             <div class="drop-controls">
               ${drop.audioData ? `<button class="play-btn" onclick="playAudio('${drop.audioData}', this)">▶️ Play</button>` : ''}
               ${drop.audioData ? `<button class="download-btn" onclick="downloadAudio('${drop.audioData}', '${drop.filename || 'recording'}')">📥 Download</button>` : ''}
+              <button class="delete-btn" onclick="deleteSoundDrop(${drop.id}, this)" title="Delete this sound drop">🗑️ Delete</button>
             </div>
           </div>
           <div class="drop-meta">
@@ -775,6 +809,79 @@
     }
 
     // Enhanced download function with MP3 conversion (same as main page)
+    async function deleteSoundDrop(dropId, button) {
+      // Confirm deletion
+      const confirmDelete = confirm(
+        `⚠️ DELETE SOUND DROP?\n\n` +
+        `This will permanently delete:\n` +
+        `• The audio recording\n` +
+        `• All comments and discussions\n` +
+        `• All applaud data\n\n` +
+        `This action CANNOT be undone!\n\n` +
+        `Are you sure you want to delete this sound drop?`
+      );
+      
+      if (!confirmDelete) {
+        return;
+      }
+      
+      // Show loading state
+      const originalText = button.textContent;
+      button.textContent = '🔄 Deleting...';
+      button.disabled = true;
+      
+      try {
+        const response = await fetch(`/api/sound-drops/${dropId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': 'Bearer research2024',
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          
+          // Show success message
+          alert(`✅ Sound drop deleted successfully!\n\nRemaining drops: ${result.remaining_drops}`);
+          
+          // Remove the drop from UI
+          const dropElement = button.closest('.drop-item');
+          if (dropElement) {
+            dropElement.style.transition = 'all 0.3s ease';
+            dropElement.style.opacity = '0';
+            dropElement.style.transform = 'translateX(-100%)';
+            
+            setTimeout(() => {
+              dropElement.remove();
+              
+              // Update statistics
+              const totalDropsElement = document.getElementById('total-drops');
+              const activeDropsElement = document.getElementById('active-drops');
+              if (totalDropsElement && activeDropsElement) {
+                const currentTotal = parseInt(totalDropsElement.textContent) - 1;
+                const currentActive = parseInt(activeDropsElement.textContent) - 1;
+                totalDropsElement.textContent = currentTotal;
+                activeDropsElement.textContent = currentActive;
+              }
+            }, 300);
+          }
+          
+        } else {
+          const error = await response.json();
+          throw new Error(error.error || 'Delete failed');
+        }
+        
+      } catch (error) {
+        console.error('Delete error:', error);
+        alert(`❌ Failed to delete sound drop:\n\n${error.message}\n\nPlease try again or contact support.`);
+        
+        // Restore button
+        button.textContent = originalText;
+        button.disabled = false;
+      }
+    }
+
     async function downloadAudio(audioData, filename) {
       if (!audioData) {
         alert('No audio data available for download');
@@ -845,6 +952,14 @@
 
     // Handle Enter key in password field
     document.addEventListener('DOMContentLoaded', function() {
+      // Refresh data function
+      function refreshData() {
+        if (adminAuthenticated) {
+          document.getElementById('data-display').innerHTML = '<div class="loading">🔄 Refreshing data...</div>';
+          loadDashboardData();
+        }
+      }
+
       document.getElementById('admin-password').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
           loginAdmin();

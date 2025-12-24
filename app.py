@@ -1301,6 +1301,38 @@ def delete_comment(drop_id, comment_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/sound-drops/<int:drop_id>', methods=['DELETE'])
+def delete_sound_drop(drop_id):
+    """Delete a sound drop - Admin only endpoint for content moderation"""
+    try:
+        # Check for admin authorization
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer ') or auth_header.split(' ')[1] != 'research2024':
+            return jsonify({'error': 'Unauthorized. Admin access required.'}), 401
+        
+        # Load existing drops
+        drops = load_sound_drops()
+        
+        # Find and remove the target drop
+        original_count = len(drops)
+        drops = [drop for drop in drops if drop['id'] != drop_id]
+        
+        if len(drops) == original_count:
+            return jsonify({'error': 'Sound drop not found'}), 404
+        
+        # Save updated drops
+        if save_sound_drops(drops):
+            return jsonify({
+                'message': f'Sound drop {drop_id} deleted successfully',
+                'deleted_id': drop_id,
+                'remaining_drops': len(drops)
+            })
+        else:
+            return jsonify({'error': 'Failed to save changes after deletion'}), 500
+        
+    except Exception as e:
+        return jsonify({'error': f'Delete operation failed: {str(e)}'}), 500
+
 @app.route('/api/upload-audio', methods=['POST'])
 def upload_audio():
     try:
