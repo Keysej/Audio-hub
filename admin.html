@@ -317,8 +317,9 @@
     async function loadDashboardData() {
       try {
         let activeData = [];
+        let dataSource = 'none';
         
-        // First try to load from ADMIN API (7-day data)
+        // First try to load from ADMIN API (7-day data) - this is the authoritative source
         try {
           const activeResponse = await fetch('/api/admin/sound-drops', {
             headers: {
@@ -327,18 +328,21 @@
           });
           if (activeResponse.ok) {
             activeData = await activeResponse.json();
-            console.log('Loaded data from Admin API (7-day window):', activeData.length, 'drops');
+            dataSource = 'admin_api';
+            console.log('✅ Loaded data from Admin API (MongoDB - authoritative):', activeData.length, 'drops');
           } else {
-            console.log('Admin API not available, trying regular API...');
+            console.log('❌ Admin API not available, trying regular API...');
             // Fallback to regular API
             const fallbackResponse = await fetch('/api/sound-drops');
             if (fallbackResponse.ok) {
               activeData = await fallbackResponse.json();
-              console.log('Loaded data from regular API (24-hour window):', activeData.length, 'drops');
+              dataSource = 'regular_api';
+              console.log('⚠️ Loaded data from regular API (24-hour window):', activeData.length, 'drops');
             }
           }
         } catch (e) {
-          console.log('API not available, will use localStorage');
+          console.log('🔄 APIs not available, using localStorage as fallback');
+          dataSource = 'localStorage';
         }
         
         // If no API data, fall back to localStorage (but with 7-day window for research)
@@ -400,16 +404,34 @@
       const dataDisplay = document.getElementById('data-display');
       let html = '';
 
-      // Data source indicator
-      const dataSource = activeData.length > 0 ? 
-        (activeData[0].id ? 'localStorage' : 'API') : 'none';
+      // Data source indicator with better detection
+      let dataSourceDisplay = '';
+      let dataSourceColor = '#e8f4fd';
+      
+      if (activeData.length > 0) {
+        // Check if we have MongoDB data (more reliable IDs) vs localStorage data
+        const hasMongoData = activeData.some(drop => drop._id || (drop.id && drop.id.toString().length > 10));
+        
+        if (hasMongoData) {
+          dataSourceDisplay = '🌐 MongoDB Database (Authoritative)';
+          dataSourceColor = '#d4edda'; // Green
+        } else {
+          dataSourceDisplay = '💾 Local Storage (Browser Only)';
+          dataSourceColor = '#fff3cd'; // Yellow warning
+        }
+      } else {
+        dataSourceDisplay = '❌ No Data Available';
+        dataSourceColor = '#f8d7da'; // Red
+      }
       
       html += `
-        <div style="background: #e8f4fd; padding: 10px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9em;">
-          📊 Data Source: ${dataSource === 'localStorage' ? '💾 Local Storage (Browser)' : 
-                            dataSource === 'API' ? '🌐 API Server' : '❌ No Data'}
+        <div style="background: ${dataSourceColor}; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9em; border-left: 4px solid #007bff;">
+          📊 <strong>Data Source:</strong> ${dataSourceDisplay}
           <br><small>🗓️ Showing data from the last 7 days (research view)</small>
-          ${dataSource === 'localStorage' ? '<br><small>💡 Data is from your browser storage. API sync may not be working.</small>' : ''}
+          ${dataSourceDisplay.includes('Local Storage') ? 
+            '<br><small>⚠️ <strong>Warning:</strong> This data is only in your browser. Delete operations may fail if not synced to server.</small>' : ''}
+          ${dataSourceDisplay.includes('MongoDB') ? 
+            '<br><small>✅ <strong>Reliable:</strong> Data is stored in the database. Delete operations will work properly.</small>' : ''}
         </div>
       `;
 
@@ -813,6 +835,7 @@
       // Confirm deletion
       const confirmDelete = confirm(
         `⚠️ DELETE SOUND DROP?\n\n` +
+        `Drop ID: ${dropId}\n\n` +
         `This will permanently delete:\n` +
         `• The audio recording\n` +
         `• All comments and discussions\n` +
@@ -831,6 +854,7 @@
       button.disabled = true;
       
       try {
+        // First, try to delete from API (MongoDB)
         const response = await fetch(`/api/sound-drops/${dropId}`, {
           method: 'DELETE',
           headers: {
@@ -842,8 +866,21 @@
         if (response.ok) {
           const result = await response.json();
           
+          // Also remove from localStorage if it exists there
+          try {
+            const localData = localStorage.getItem('soundDropsBackup');
+            if (localData) {
+              const parsedData = JSON.parse(localData);
+              const filteredData = parsedData.filter(drop => drop.id != dropId);
+              localStorage.setItem('soundDropsBackup', JSON.stringify(filteredData));
+              console.log('✅ Also removed from localStorage');
+            }
+          } catch (e) {
+            console.log('⚠️ Could not update localStorage:', e);
+          }
+          
           // Show success message
-          alert(`✅ Sound drop deleted successfully!\n\nRemaining drops: ${result.remaining_drops}`);
+          alert(`✅ Sound drop deleted successfully!\n\nDrop ID: ${dropId}\nRemaining drops: ${result.remaining_drops}`);
           
           // Remove the drop from UI
           const dropElement = button.closest('.drop-item');
@@ -859,8 +896,8 @@
               const totalDropsElement = document.getElementById('total-drops');
               const activeDropsElement = document.getElementById('active-drops');
               if (totalDropsElement && activeDropsElement) {
-                const currentTotal = parseInt(totalDropsElement.textContent) - 1;
-                const currentActive = parseInt(activeDropsElement.textContent) - 1;
+                const currentTotal = Math.max(0, parseInt(totalDropsElement.textContent) - 1);
+                const currentActive = Math.max(0, parseInt(activeDropsElement.textContent) - 1);
                 totalDropsElement.textContent = currentTotal;
                 activeDropsElement.textContent = currentActive;
               }
@@ -869,16 +906,54 @@
           
         } else {
           const error = await response.json();
+          
+          // If sound drop not found in MongoDB, try removing from localStorage only
+          if (error.error && error.error.includes('not found')) {
+            const localDeleted = await deleteFromLocalStorageOnly(dropId);
+            if (localDeleted) {
+              alert(`⚠️ Sound drop was only in local storage and has been removed.\n\nDrop ID: ${dropId}\n\nNote: This drop may not have been synced to the server.`);
+              
+              // Remove from UI
+              const dropElement = button.closest('.drop-item');
+              if (dropElement) {
+                dropElement.remove();
+              }
+              return;
+            }
+          }
+          
           throw new Error(error.error || 'Delete failed');
         }
         
       } catch (error) {
         console.error('Delete error:', error);
-        alert(`❌ Failed to delete sound drop:\n\n${error.message}\n\nPlease try again or contact support.`);
+        alert(`❌ Failed to delete sound drop:\n\nDrop ID: ${dropId}\nError: ${error.message}\n\n💡 This might be because:\n• The sound is only stored locally\n• The sound was already deleted\n• Network connection issues\n\nTry refreshing the page and try again.`);
         
         // Restore button
         button.textContent = originalText;
         button.disabled = false;
+      }
+    }
+    
+    // Helper function to delete from localStorage only
+    async function deleteFromLocalStorageOnly(dropId) {
+      try {
+        const localData = localStorage.getItem('soundDropsBackup');
+        if (localData) {
+          const parsedData = JSON.parse(localData);
+          const originalLength = parsedData.length;
+          const filteredData = parsedData.filter(drop => drop.id != dropId);
+          
+          if (filteredData.length < originalLength) {
+            localStorage.setItem('soundDropsBackup', JSON.stringify(filteredData));
+            console.log('✅ Removed from localStorage only');
+            return true;
+          }
+        }
+        return false;
+      } catch (e) {
+        console.error('❌ Error removing from localStorage:', e);
+        return false;
       }
     }
 
