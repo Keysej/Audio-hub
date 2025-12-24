@@ -1167,6 +1167,9 @@ def toggle_applaud(drop_id):
         data = request.get_json()
         applaud = data.get('applaud', True)
         
+        # Rate limiting: Get client IP for basic protection
+        client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown'))
+        
         # Load existing drops
         drops = load_sound_drops()
         
@@ -1183,6 +1186,10 @@ def toggle_applaud(drop_id):
         # Initialize applauds if not exists
         if 'applauds' not in target_drop:
             target_drop['applauds'] = 0
+        
+        # Reasonable applaud limits for research integrity
+        if applaud and target_drop['applauds'] >= 100:
+            return jsonify({'error': 'This sound has reached the maximum applaud limit (100). Thank you for your enthusiasm!'}), 400
         
         # Update applaud count
         if applaud:

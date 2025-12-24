@@ -1163,9 +1163,27 @@ function renderComments(comments) {
 async function toggleApplaud(dropId) {
   console.log('Toggling applaud for drop:', dropId);
   
+  // Check applaud rate limit (max 15 applauds per minute for research)
+  const applaudLimitKey = 'applaud_rate_limit';
+  const now = Date.now();
+  const applaudHistory = JSON.parse(localStorage.getItem(applaudLimitKey) || '[]');
+  
+  // Remove applauds older than 1 minute
+  const recentApplauds = applaudHistory.filter(timestamp => now - timestamp < 60000);
+  
   // Get current applaud state from localStorage
   const applaudKey = `applaud_${dropId}`;
   const hasApplauded = localStorage.getItem(applaudKey) === 'true';
+  
+  // Check if adding new applaud (not removing)
+  if (!hasApplauded) {
+    if (recentApplauds.length >= 15) {
+      showErrorMessage('Please slow down! You can applaud up to 15 sounds per minute. Take a moment to listen thoughtfully. 🎵', 'warning');
+      return;
+    }
+    recentApplauds.push(now);
+    localStorage.setItem(applaudLimitKey, JSON.stringify(recentApplauds));
+  }
   
   // Update localStorage
   localStorage.setItem(applaudKey, (!hasApplauded).toString());
@@ -1533,12 +1551,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
       
-      // Check file size (limit to 50MB)
-      if (file.size > 50 * 1024 * 1024) {
-        alert('File is too large. Please select an audio file smaller than 50MB.');
+      // Check file size (limit to 100MB for high-quality research recordings)
+      if (file.size > 100 * 1024 * 1024) {
+        alert('File is too large. Please select an audio file smaller than 100MB.\n\nTip: For best quality while staying under the limit:\n• WAV files: ~10MB per minute\n• MP3 files: ~1MB per minute\n• Consider recording at 44.1kHz, 16-bit for optimal quality/size balance');
         e.target.value = ''; // Clear the input
         return;
       }
+      
+      // Show file info for transparency
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      console.log(`📁 File selected: ${file.name} (${fileSizeMB}MB)`);
+      showNotification(`File ready: ${file.name} (${fileSizeMB}MB)`, 'info');
       
       const context = prompt(`How does this sound relate to today's theme: "${theme.title}"?`);
       if (context !== null) { // User didn't cancel the prompt
