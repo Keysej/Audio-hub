@@ -976,8 +976,11 @@ def export_research_data():
         }), 500
 
 # Helper function to get current theme
-def get_current_theme():
-    themes = [
+def get_current_theme(group_code='default'):
+    """Get current theme based on group code - allows different groups to have different themes"""
+    
+    # Base themes that all groups can use
+    base_themes = [
         {
             "title": "Urban Soundscapes",
             "description": "Capture the sounds that define our urban environment. Street noise, construction, conversations, traffic, music bleeding from windows - what audio defines city life for you?"
@@ -1008,19 +1011,149 @@ def get_current_theme():
         }
     ]
     
+    # Group-specific theme variations (for research flexibility)
+    group_themes = {
+        'group_a': [
+            {
+                "title": "Morning Rituals",
+                "description": "The sounds that start your day. Coffee brewing, alarms, morning news, or the quiet moments before the world wakes up."
+            },
+            {
+                "title": "Social Connections",
+                "description": "Audio that represents human connection. Conversations, laughter, phone calls, or the sounds of gathering spaces."
+            }
+        ],
+        'group_b': [
+            {
+                "title": "Evening Reflections",
+                "description": "Sounds that close your day. Wind down routines, night sounds, or audio that helps you process the day's experiences."
+            },
+            {
+                "title": "Creative Spaces",
+                "description": "The audio environment of creativity. Studio sounds, practice sessions, or the background noise that inspires you."
+            }
+        ],
+        'control': base_themes,  # Control group gets standard themes
+        'default': base_themes   # Default fallback
+    }
+    
+    # Select theme set based on group
+    themes = group_themes.get(group_code, base_themes)
+    
+    # Calculate theme rotation (can be customized per group)
     today = datetime.datetime.now()
-    day_of_year = today.timetuple().tm_yday
-    return themes[day_of_year % len(themes)]
+    
+    # Different rotation schedules for different groups (research flexibility)
+    if group_code == 'group_a':
+        # Group A: Weekly rotation starting Monday
+        week_number = today.isocalendar()[1]
+        theme_index = week_number % len(themes)
+    elif group_code == 'group_b':
+        # Group B: Bi-weekly rotation with offset
+        week_number = today.isocalendar()[1]
+        theme_index = (week_number // 2 + 1) % len(themes)  # Offset by 1
+    else:
+        # Default: Daily rotation
+        day_of_year = today.timetuple().tm_yday
+        theme_index = day_of_year % len(themes)
+    
+    selected_theme = themes[theme_index]
+    
+    # Add group metadata to theme
+    selected_theme['group_code'] = group_code
+    selected_theme['rotation_type'] = 'weekly' if group_code in ['group_a', 'group_b'] else 'daily'
+    
+    return selected_theme
 
 @app.route('/api/theme', methods=['GET'])
 def get_theme():
     """Get current theme - ensures frontend and backend use same theme"""
-    theme = get_current_theme()
+    group_code = request.args.get('group', 'default')
+    theme = get_current_theme(group_code)
     return jsonify(theme)
+
+@app.route('/api/groups', methods=['GET'])
+def get_groups():
+    """Get available research groups"""
+    groups = {
+        'default': {
+            'name': 'General Study',
+            'description': 'Standard SoundDrop experience with daily themes',
+            'active': True,
+            'participant_limit': None
+        },
+        'group_a': {
+            'name': 'Morning Focus Group',
+            'description': 'Weekly themes focusing on morning rituals and social connections',
+            'active': True,
+            'participant_limit': 50
+        },
+        'group_b': {
+            'name': 'Evening Reflection Group', 
+            'description': 'Bi-weekly themes focusing on evening routines and creative spaces',
+            'active': True,
+            'participant_limit': 50
+        },
+        'control': {
+            'name': 'Control Group',
+            'description': 'Standard daily themes for baseline comparison',
+            'active': True,
+            'participant_limit': 30
+        }
+    }
+    return jsonify(groups)
+
+@app.route('/api/groups/<group_code>/stats', methods=['GET'])
+def get_group_stats(group_code):
+    """Get statistics for a specific group"""
+    try:
+        # Load all drops and filter by group
+        all_drops = load_sound_drops()
+        group_drops = [drop for drop in all_drops if drop.get('group_code', 'default') == group_code]
+        
+        # Calculate stats
+        total_drops = len(group_drops)
+        total_applauds = sum(len(drop.get('applauds', [])) for drop in group_drops)
+        total_comments = sum(len(drop.get('discussions', [])) for drop in group_drops)
+        
+        # Get unique participants (rough estimate based on unique audio patterns)
+        unique_participants = len(set(drop.get('filename', '') for drop in group_drops if drop.get('filename')))
+        
+        # Recent activity (last 7 days)
+        now = datetime.datetime.now().timestamp() * 1000
+        seven_days_ms = 7 * 24 * 60 * 60 * 1000
+        recent_drops = [drop for drop in group_drops if (now - drop['timestamp']) < seven_days_ms]
+        
+        return jsonify({
+            'group_code': group_code,
+            'total_drops': total_drops,
+            'total_applauds': total_applauds,
+            'total_comments': total_comments,
+            'estimated_participants': unique_participants,
+            'recent_activity': {
+                'drops_last_7_days': len(recent_drops),
+                'active_days': len(set(
+                    datetime.datetime.fromtimestamp(drop['timestamp'] / 1000).date().isoformat()
+                    for drop in recent_drops
+                ))
+            },
+            'current_theme': get_current_theme(group_code)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/sound-drops', methods=['GET'])
 def get_sound_drops():
+    # Get group parameter from query string
+    group_code = request.args.get('group', 'default')
+    
     drops = load_sound_drops()
+    
+    # Filter drops by group
+    if group_code != 'all':  # 'all' is for admin access
+        drops = [drop for drop in drops if drop.get('group_code', 'default') == group_code]
+    
     return jsonify(drops)
 
 @app.route('/api/admin/sound-drops', methods=['GET'])
@@ -1030,6 +1163,9 @@ def get_admin_sound_drops():
     auth_header = request.headers.get('Authorization')
     if not auth_header or auth_header != 'Bearer research2024':
         return jsonify({'error': 'Admin access required'}), 403
+    
+    # Get group filter parameter
+    group_filter = request.args.get('group', 'all')
     
     try:
         # Load data from file storage (active data)
@@ -1077,6 +1213,11 @@ def get_admin_sound_drops():
         seven_days_ms = 7 * 24 * 60 * 60 * 1000  # 7 days in milliseconds
         admin_drops = [drop for drop in unique_data if (now - drop['timestamp']) < seven_days_ms]
         
+        # Apply group filter if specified
+        if group_filter != 'all':
+            admin_drops = [drop for drop in admin_drops if drop.get('group_code', 'default') == group_filter]
+            print(f"Admin API: Filtered to group '{group_filter}': {len(admin_drops)} drops")
+        
         # Sort by timestamp (newest first)
         admin_drops.sort(key=lambda x: x['timestamp'], reverse=True)
         
@@ -1121,7 +1262,8 @@ def create_sound_drop():
             'type': data.get('type', 'recorded'),
             'filename': data.get('filename', f"recording_{drop_timestamp}"),
             'discussions': [],
-            'applauds': []  # Initialize as empty array, not 0
+            'applauds': [],  # Initialize as empty array, not 0
+            'group_code': data.get('group_code', 'default')  # Add group support
         }
         
         # Load existing drops and check for duplicates

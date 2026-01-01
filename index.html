@@ -34,6 +34,37 @@
       </div>
     </div>
 
+    <!-- Group Selection Section -->
+    <div class="group-section" id="group-section" style="display: none;">
+      <div class="group-card">
+        <h2>🔬 Research Group Selection</h2>
+        <p>Please select your assigned research group to continue:</p>
+        <div class="group-options">
+          <div class="group-option" data-group="default">
+            <h3>General Study</h3>
+            <p>Standard SoundDrop experience with daily themes</p>
+          </div>
+          <div class="group-option" data-group="group_a">
+            <h3>Morning Focus Group</h3>
+            <p>Weekly themes focusing on morning rituals and social connections</p>
+          </div>
+          <div class="group-option" data-group="group_b">
+            <h3>Evening Reflection Group</h3>
+            <p>Bi-weekly themes focusing on evening routines and creative spaces</p>
+          </div>
+          <div class="group-option" data-group="control">
+            <h3>Control Group</h3>
+            <p>Standard daily themes for baseline comparison</p>
+          </div>
+        </div>
+        <div class="group-code-entry">
+          <p><strong>Or enter your group code:</strong></p>
+          <input type="text" id="group-code-input" placeholder="Enter group code (e.g., GROUP_A_JAN2025)">
+          <button id="join-group-btn">Join Group</button>
+        </div>
+      </div>
+    </div>
+
     <div class="theme-section">
       <div class="theme-card">
         <h2 class="theme-title">Today's Theme: <span id="daily-theme">"Urban Soundscapes"</span></h2>

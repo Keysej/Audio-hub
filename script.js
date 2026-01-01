@@ -37,13 +37,95 @@ let audioChunks = [];
 let recordingStartTime;
 let recordingInterval;
 
+// Group management
+let currentGroup = localStorage.getItem('sounddrop_group') || null;
+
+// Group selection functions
+function showGroupSelection() {
+  document.getElementById('group-section').style.display = 'block';
+  document.querySelector('.theme-section').style.display = 'none';
+  document.querySelector('.actions-section').style.display = 'none';
+  document.querySelector('.drops-section').style.display = 'none';
+}
+
+function hideGroupSelection() {
+  document.getElementById('group-section').style.display = 'none';
+  document.querySelector('.theme-section').style.display = 'block';
+  document.querySelector('.actions-section').style.display = 'block';
+  document.querySelector('.drops-section').style.display = 'block';
+}
+
+function selectGroup(groupCode) {
+  currentGroup = groupCode;
+  localStorage.setItem('sounddrop_group', groupCode);
+  
+  // Update UI
+  hideGroupSelection();
+  showCurrentGroupIndicator();
+  
+  // Refresh data for new group
+  initializeApp();
+  
+  console.log(`✅ Joined group: ${groupCode}`);
+  showNotification(`Joined research group: ${groupCode}`, 'success');
+}
+
+function showCurrentGroupIndicator() {
+  // Remove existing indicator
+  const existing = document.querySelector('.current-group-indicator');
+  if (existing) existing.remove();
+  
+  if (currentGroup) {
+    const indicator = document.createElement('div');
+    indicator.className = 'current-group-indicator';
+    indicator.textContent = `Group: ${currentGroup}`;
+    indicator.onclick = () => {
+      if (confirm('Do you want to change your research group? This will reload the page.')) {
+        localStorage.removeItem('sounddrop_group');
+        location.reload();
+      }
+    };
+    document.body.appendChild(indicator);
+  }
+}
+
+async function loadAvailableGroups() {
+  try {
+    const response = await fetch('/api/groups');
+    if (response.ok) {
+      const groups = await response.json();
+      
+      // Update group options with real data
+      const groupOptions = document.querySelectorAll('.group-option');
+      groupOptions.forEach(option => {
+        const groupCode = option.dataset.group;
+        const groupData = groups[groupCode];
+        
+        if (groupData) {
+          option.querySelector('h3').textContent = groupData.name;
+          option.querySelector('p').textContent = groupData.description;
+          
+          if (!groupData.active) {
+            option.style.opacity = '0.5';
+            option.style.pointerEvents = 'none';
+            option.querySelector('p').textContent += ' (Currently inactive)';
+          }
+        }
+      });
+    }
+  } catch (error) {
+    console.warn('Could not load group data from API:', error);
+  }
+}
+
 // Get today's theme from API to ensure consistency with backend
 async function getTodaysTheme() {
   try {
-    const response = await fetch('/api/theme');
+    const groupParam = currentGroup ? `?group=${currentGroup}` : '';
+    const response = await fetch(`/api/theme${groupParam}`);
     if (response.ok) {
       const theme = await response.json();
-      console.log('✅ Got theme from API:', theme.title);
+      console.log('✅ Got theme from API:', theme.title, currentGroup ? `(Group: ${currentGroup})` : '');
       return theme;
     }
   } catch (error) {
@@ -70,7 +152,8 @@ async function getSoundDrops() {
     console.log('🔍 Browser:', navigator.userAgent);
     console.log('🔍 Current URL:', window.location.href);
     
-    const response = await fetch('/api/sound-drops', { 
+    const groupParam = currentGroup ? `?group=${currentGroup}` : '';
+    const response = await fetch(`/api/sound-drops${groupParam}`, { 
       timeout: 5000 // 5 second timeout
     });
     console.log('📡 API response status:', response.status, 'URL:', response.url);
@@ -326,7 +409,8 @@ async function saveSoundDrop(audioBlob, context, type, filename) {
         audioData: reader.result,
         context: context || '',
         type: type, // 'recorded' or 'uploaded'
-        filename: filename || `recording_${Date.now()}`
+        filename: filename || `recording_${Date.now()}`,
+        group_code: currentGroup || 'default'
       };
       
       console.log('Sending to API:', dropData);
@@ -1438,6 +1522,48 @@ function cleanupOldData() {
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
+  // Check if user needs to select a group first
+  if (!currentGroup) {
+    showGroupSelection();
+    await loadAvailableGroups();
+    
+    // Add event listeners for group selection
+    document.querySelectorAll('.group-option').forEach(option => {
+      option.addEventListener('click', () => {
+        // Remove previous selection
+        document.querySelectorAll('.group-option').forEach(opt => opt.classList.remove('selected'));
+        // Select this option
+        option.classList.add('selected');
+        // Join group after short delay for visual feedback
+        setTimeout(() => selectGroup(option.dataset.group), 300);
+      });
+    });
+    
+    // Add event listener for custom group code
+    document.getElementById('join-group-btn').addEventListener('click', () => {
+      const customCode = document.getElementById('group-code-input').value.trim();
+      if (customCode) {
+        selectGroup(customCode.toLowerCase());
+      }
+    });
+    
+    document.getElementById('group-code-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('join-group-btn').click();
+      }
+    });
+    
+    return; // Don't initialize the rest until group is selected
+  }
+  
+  // Show current group indicator
+  showCurrentGroupIndicator();
+  
+  // Initialize the main app
+  await initializeApp();
+});
+
+async function initializeApp() {
   // Clean up old data first
   cleanupOldData();
   

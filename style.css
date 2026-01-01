@@ -1569,4 +1569,167 @@ body {
   position: absolute;
   left: 0;
 }
+
+/* Group Selection Styles */
+.group-section {
+  margin-bottom: 30px;
+  animation: slideIn 0.5s ease-out;
+}
+
+.group-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 30px;
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+  text-align: center;
+}
+
+.group-card h2 {
+  margin: 0 0 15px 0;
+  font-size: 1.8em;
+  font-weight: 700;
+}
+
+.group-card > p {
+  margin-bottom: 25px;
+  opacity: 0.9;
+  font-size: 1.1em;
+}
+
+.group-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.group-option {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 15px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+}
+
+.group-option:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.group-option.selected {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: #00e676;
+  box-shadow: 0 0 20px rgba(0, 230, 118, 0.4);
+}
+
+.group-option h3 {
+  margin: 0 0 10px 0;
+  font-size: 1.2em;
+  font-weight: 600;
+}
+
+.group-option p {
+  margin: 0;
+  opacity: 0.9;
+  font-size: 0.95em;
+  line-height: 1.4;
+}
+
+.group-code-entry {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.group-code-entry p {
+  margin: 0 0 15px 0;
+  font-weight: 600;
+}
+
+.group-code-entry input {
+  width: 100%;
+  max-width: 300px;
+  padding: 12px 15px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 16px;
+  margin-bottom: 15px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.group-code-entry input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.group-code-entry input:focus {
+  outline: none;
+  border-color: #00e676;
+  box-shadow: 0 0 15px rgba(0, 230, 118, 0.3);
+}
+
+.group-code-entry button {
+  background: #00e676;
+  color: #1a1a2e;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.group-code-entry button:hover {
+  background: #00c853;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 230, 118, 0.4);
+}
+
+/* Current Group Indicator */
+.current-group-indicator {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: rgba(102, 126, 234, 0.9);
+  color: white;
+  padding: 8px 15px;
+  border-radius: 20px;
+  font-size: 0.85em;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  z-index: 1000;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.current-group-indicator:hover {
+  background: rgba(102, 126, 234, 1);
+  transform: scale(1.05);
+}
+
+@media (max-width: 768px) {
+  .group-options {
+    grid-template-columns: 1fr;
+  }
+  
+  .current-group-indicator {
+    position: relative;
+    top: auto;
+    right: auto;
+    margin: 10px auto;
+    display: block;
+    width: fit-content;
+  }
+}
   
