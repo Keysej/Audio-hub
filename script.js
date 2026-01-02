@@ -1532,6 +1532,10 @@ function cleanupOldData() {
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('🚀 App initializing, current group:', currentGroup);
   
+  // Always start countdown timer regardless of group selection
+  updateCountdown();
+  setInterval(updateCountdown, 1000);
+  
   // Check if user needs to select a group first
   if (!currentGroup) {
     console.log('👥 No group selected, showing group selection');
@@ -1587,10 +1591,6 @@ async function initializeApp() {
   const theme = await getTodaysTheme();
   document.getElementById('daily-theme').textContent = `"${theme.title}"`;
   document.getElementById('theme-description').textContent = theme.description;
-  
-  // Start countdown timer
-  updateCountdown();
-  setInterval(updateCountdown, 1000);
   
   // ALWAYS show local data first for immediate loading - don't wait for API
   const localData = getLocalBackup();
