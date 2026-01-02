@@ -40,6 +40,14 @@ let recordingInterval;
 // Group management
 let currentGroup = localStorage.getItem('sounddrop_group') || null;
 
+// Check for reset parameter in URL
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('reset') === 'true') {
+  localStorage.removeItem('sounddrop_group');
+  currentGroup = null;
+  console.log('🔄 Group reset via URL parameter');
+}
+
 // Group selection functions
 function showGroupSelection() {
   document.getElementById('group-section').style.display = 'block';
@@ -1522,8 +1530,11 @@ function cleanupOldData() {
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
+  console.log('🚀 App initializing, current group:', currentGroup);
+  
   // Check if user needs to select a group first
   if (!currentGroup) {
+    console.log('👥 No group selected, showing group selection');
     showGroupSelection();
     await loadAvailableGroups();
     
@@ -1555,6 +1566,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     return; // Don't initialize the rest until group is selected
   }
+  
+  console.log('✅ Group already selected:', currentGroup);
   
   // Show current group indicator
   showCurrentGroupIndicator();
