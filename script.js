@@ -1484,8 +1484,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
   
-  // File upload
+    // File upload
     document.getElementById('file-upload').addEventListener('change', handleFileUpload);
+    
+    // Force refresh button
+    document.getElementById('refresh-btn').addEventListener('click', async () => {
+      const refreshBtn = document.getElementById('refresh-btn');
+      const originalText = refreshBtn.innerHTML;
+      refreshBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Refreshing...';
+      refreshBtn.disabled = true;
+      
+      // Clear localStorage cache
+      localStorage.removeItem('soundDropsBackup');
+      console.log('🗑️ Cleared localStorage cache');
+      
+      // Force fetch from server
+      try {
+        const freshData = await getSoundDrops();
+        await renderSoundDropsFromData(freshData);
+        await updateStatsFromData(freshData);
+        
+        refreshBtn.innerHTML = '<i class="fa-solid fa-check"></i> Refreshed!';
+        setTimeout(() => {
+          refreshBtn.innerHTML = originalText;
+          refreshBtn.disabled = false;
+        }, 2000);
+        
+        showNotification('✅ Data refreshed from server!', 'success');
+      } catch (error) {
+        console.error('Force refresh failed:', error);
+        refreshBtn.innerHTML = originalText;
+        refreshBtn.disabled = false;
+        showNotification('❌ Refresh failed. Please try again.', 'error');
+      }
+    });
     
     console.log('✅ Event listeners set up successfully');
   } catch (error) {
