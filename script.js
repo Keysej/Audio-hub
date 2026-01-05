@@ -1444,14 +1444,53 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Check device capabilities first
   const capabilities = checkDeviceCapabilities();
   
-  // Set today's theme
-  const theme = await getTodaysTheme();
+  // Set today's theme with error handling
+  try {
+    const theme = await getTodaysTheme();
   document.getElementById('daily-theme').textContent = `"${theme.title}"`;
   document.getElementById('theme-description').textContent = theme.description;
+    console.log('✅ Theme loaded:', theme.title);
+  } catch (error) {
+    console.error('❌ Failed to load theme:', error);
+    // Fallback theme
+    document.getElementById('daily-theme').textContent = '"Urban Soundscapes"';
+    document.getElementById('theme-description').textContent = 'Capture the sounds that define our urban environment.';
+  }
   
   // Start countdown timer
   updateCountdown();
   setInterval(updateCountdown, 1000);
+  
+  // Set up event listeners IMMEDIATELY - don't wait for API
+  console.log('🔧 Setting up event listeners...');
+  try {
+  document.getElementById('drop-sound-btn').addEventListener('click', showRecordingSection);
+  document.getElementById('record-btn').addEventListener('click', startRecording);
+  document.getElementById('stop-btn').addEventListener('click', stopRecording);
+    document.getElementById('link-btn').addEventListener('click', showLinkModal);
+    document.getElementById('sync-btn').addEventListener('click', async () => {
+      document.getElementById('sync-btn').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing...';
+      await syncLocalSoundsToServer(true);
+      document.getElementById('sync-btn').innerHTML = '<i class="fa-solid fa-sync"></i> Sync Local Sounds';
+    });
+  
+  // Filter buttons
+  document.querySelectorAll('.filter-tag').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+      document.querySelectorAll('.filter-tag').forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+        const freshData = await getSoundDrops();
+        renderSoundDropsFromData(freshData, e.target.dataset.filter);
+    });
+  });
+  
+  // File upload
+    document.getElementById('file-upload').addEventListener('change', handleFileUpload);
+    
+    console.log('✅ Event listeners set up successfully');
+  } catch (error) {
+    console.error('❌ Error setting up event listeners:', error);
+  }
   
   // ALWAYS show local data first for immediate loading - don't wait for API
   const localData = getLocalBackup();
@@ -1507,28 +1546,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('📱 But local data is already displayed');
   }
   
-  // Event listeners
-  document.getElementById('drop-sound-btn').addEventListener('click', showRecordingSection);
-  document.getElementById('record-btn').addEventListener('click', startRecording);
-  document.getElementById('stop-btn').addEventListener('click', stopRecording);
-  document.getElementById('link-btn').addEventListener('click', showLinkModal);
-  document.getElementById('sync-btn').addEventListener('click', async () => {
-    document.getElementById('sync-btn').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing...';
-    await syncLocalSoundsToServer(true); // Force sync when manually triggered
-    document.getElementById('sync-btn').innerHTML = '<i class="fa-solid fa-sync"></i> Sync Local Sounds';
-  });
+  // Event listeners are now set up earlier in the initialization
   
-  // Filter buttons
-  document.querySelectorAll('.filter-tag').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      document.querySelectorAll('.filter-tag').forEach(b => b.classList.remove('active'));
-      e.target.classList.add('active');
-      const freshData = await getSoundDrops();
-      renderSoundDropsFromData(freshData, e.target.dataset.filter);
-    });
-  });
-  
-  // File upload
+  // File upload handler (keeping this one as it has different logic)
   document.getElementById('file-upload').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (file) {
