@@ -831,6 +831,8 @@
       button.disabled = true;
       
       try {
+        console.log('🗑️ Attempting to delete sound drop with ID:', dropId, 'Type:', typeof dropId);
+        
         const response = await fetch(`/api/sound-drops/${dropId}`, {
           method: 'DELETE',
           headers: {

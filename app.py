@@ -1301,7 +1301,7 @@ def delete_comment(drop_id, comment_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/sound-drops/<int:drop_id>', methods=['DELETE'])
+@app.route('/api/sound-drops/<drop_id>', methods=['DELETE'])
 def delete_sound_drop(drop_id):
     """Delete a sound drop - Admin only endpoint for content moderation"""
     try:
@@ -1310,22 +1310,57 @@ def delete_sound_drop(drop_id):
         if not auth_header.startswith('Bearer ') or auth_header.split(' ')[1] != 'research2024':
             return jsonify({'error': 'Unauthorized. Admin access required.'}), 401
         
-        # Load existing drops
-        drops = load_sound_drops()
+        # Convert drop_id to appropriate type (handle both string and int IDs)
+        try:
+            drop_id_int = int(drop_id)
+        except ValueError:
+            drop_id_int = None
         
-        # Find and remove the target drop
+        print(f"🗑️ DELETE REQUEST: Looking for drop with ID '{drop_id}' (int: {drop_id_int})")
+        
+        # Load existing drops from both sources
+        drops = load_sound_drops()
+        print(f"📊 Found {len(drops)} total drops to search")
+        
+        # Debug: Print all drop IDs
+        for i, drop in enumerate(drops):
+            print(f"  Drop {i}: ID={drop.get('id')} (type: {type(drop.get('id'))})")
+        
+        # Find and remove the target drop (check both string and int versions)
         original_count = len(drops)
-        drops = [drop for drop in drops if drop['id'] != drop_id]
+        drops = [drop for drop in drops if str(drop['id']) != str(drop_id) and drop['id'] != drop_id_int]
         
         if len(drops) == original_count:
-            return jsonify({'error': 'Sound drop not found'}), 404
+            print(f"❌ Sound drop with ID '{drop_id}' not found in {original_count} drops")
+            return jsonify({'error': f'Sound drop not found. ID: {drop_id}'}), 404
         
-        # Save updated drops
-        if save_sound_drops(drops):
+        # Save updated drops to file storage
+        file_save_success = save_sound_drops(drops)
+        
+        # Also try to delete from MongoDB if available
+        mongo_delete_success = False
+        if USE_MONGODB_PRIMARY and mongo_db is not None:
+            try:
+                # Try to delete from MongoDB using both string and ObjectId
+                mongo_result = mongo_db.active_sounds.delete_one({
+                    '$or': [
+                        {'id': drop_id},
+                        {'id': drop_id_int},
+                        {'id': str(drop_id)}
+                    ]
+                })
+                mongo_delete_success = mongo_result.deleted_count > 0
+                print(f"🗄️ MongoDB delete result: {mongo_result.deleted_count} documents deleted")
+            except Exception as mongo_error:
+                print(f"MongoDB delete failed: {mongo_error}")
+        
+        if file_save_success:
+            print(f"✅ Successfully deleted drop {drop_id}. Remaining: {len(drops)}")
             return jsonify({
                 'message': f'Sound drop {drop_id} deleted successfully',
                 'deleted_id': drop_id,
-                'remaining_drops': len(drops)
+                'remaining_drops': len(drops),
+                'mongo_deleted': mongo_delete_success
             })
         else:
             return jsonify({'error': 'Failed to save changes after deletion'}), 500
