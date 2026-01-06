@@ -844,8 +844,16 @@
         if (response.ok) {
           const result = await response.json();
           
+          // Clear localStorage to force fresh data fetch on main page
+          try {
+            localStorage.removeItem('soundDropsBackup');
+            console.log('🗑️ Cleared localStorage after admin deletion');
+          } catch (e) {
+            console.log('Could not clear localStorage:', e);
+          }
+          
           // Show success message
-          alert(`✅ Sound drop deleted successfully!\n\nRemaining drops: ${result.remaining_drops}`);
+          alert(`✅ Sound drop deleted successfully!\n\nRemaining drops: ${result.remaining_drops}\n\nMain page will sync automatically.`);
           
           // Remove the drop from UI
           const dropElement = button.closest('.drop-item');

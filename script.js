@@ -1438,6 +1438,12 @@ function cleanupOldData() {
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
+  console.log('🚀 SoundDrop initializing...');
+  
+  // Clear localStorage cache to ensure fresh data (especially after admin deletions)
+  console.log('🗑️ Clearing localStorage cache for fresh start...');
+  localStorage.removeItem('soundDropsBackup');
+  
   // Clean up old data first
   cleanupOldData();
   
@@ -1484,40 +1490,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
   
-    // File upload
+  // File upload
     document.getElementById('file-upload').addEventListener('change', handleFileUpload);
     
-    // Force refresh button
-    document.getElementById('refresh-btn').addEventListener('click', async () => {
-      const refreshBtn = document.getElementById('refresh-btn');
-      const originalText = refreshBtn.innerHTML;
-      refreshBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Refreshing...';
-      refreshBtn.disabled = true;
-      
-      // Clear localStorage cache
-      localStorage.removeItem('soundDropsBackup');
-      console.log('🗑️ Cleared localStorage cache');
-      
-      // Force fetch from server
-      try {
-        const freshData = await getSoundDrops();
-        await renderSoundDropsFromData(freshData);
-        await updateStatsFromData(freshData);
-        
-        refreshBtn.innerHTML = '<i class="fa-solid fa-check"></i> Refreshed!';
-        setTimeout(() => {
-          refreshBtn.innerHTML = originalText;
-          refreshBtn.disabled = false;
-        }, 2000);
-        
-        showNotification('✅ Data refreshed from server!', 'success');
-      } catch (error) {
-        console.error('Force refresh failed:', error);
-        refreshBtn.innerHTML = originalText;
-        refreshBtn.disabled = false;
-        showNotification('❌ Refresh failed. Please try again.', 'error');
-      }
-    });
+    // Force refresh button removed - auto-sync handles everything
     
     console.log('✅ Event listeners set up successfully');
   } catch (error) {
@@ -1645,10 +1621,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   
-  // Refresh data every 5 minutes to show new drops and comments from other users
+  // Refresh data every 30 seconds for better cross-platform sync and applaud visibility
   setInterval(async () => {
     try {
-      console.log('Auto-refreshing data for collaboration...');
+      console.log('🔄 Auto-sync: Refreshing for cross-platform collaboration...');
       
       // Clean up old localStorage data during refresh
       cleanupOldData();
@@ -1681,7 +1657,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
       console.log('Auto-refresh failed:', error);
     }
-  }, 5 * 60 * 1000); // 5 minutes instead of 10 seconds
+  }, 30 * 1000); // 30 seconds for responsive cross-platform sync
   
   // Separate sync interval - check for local sounds to sync every 5 minutes
   setInterval(async () => {
@@ -1692,7 +1668,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
       console.log('Periodic sync failed:', error);
     }
-  }, 5 * 60 * 1000); // 5 minutes
+  }, 30 * 1000); // 30 seconds for better sync
   
   // Only show demo content if API is completely broken AND no local data exists
   // Don't show demo if we're getting empty arrays from a working API
