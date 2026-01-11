@@ -256,21 +256,97 @@ body {
   margin-bottom: 30px;
 }
 
-/* Audio quality indicator */
+/* Audio quality indicator - mobile optimized */
 .audio-quality-indicator {
   background: linear-gradient(135deg, #28a745, #20c997);
   color: white;
-  padding: 8px 15px;
-  border-radius: 20px;
+  padding: 10px 20px;
+  border-radius: 25px;
   font-weight: 600;
   text-align: center;
   box-shadow: 0 2px 10px rgba(40, 167, 69, 0.3);
   animation: qualityPulse 2s ease-in-out infinite;
+  font-size: 0.9em;
+  
+  /* Mobile touch optimization */
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .audio-quality-indicator {
+    padding: 8px 16px;
+    font-size: 0.8em;
+    border-radius: 20px;
+  }
 }
 
 @keyframes qualityPulse {
   0%, 100% { transform: scale(1); opacity: 0.9; }
   50% { transform: scale(1.02); opacity: 1; }
+}
+
+/* Universal cross-platform optimizations */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Mobile-first responsive design */
+@media (max-width: 768px) {
+  .container {
+    padding: 15px;
+    margin: 10px;
+  }
+  
+  .recorder-card {
+    padding: 20px;
+  }
+  
+  .recorder-controls button {
+    min-height: 48px;
+    padding: 12px 20px;
+    font-size: 1em;
+    touch-action: manipulation;
+  }
+  
+  .record-btn {
+    width: 70px !important;
+    height: 70px !important;
+    font-size: 1.2em !important;
+  }
+  
+  .stop-btn {
+    min-height: 48px;
+    padding: 12px 20px;
+  }
+}
+
+/* Desktop optimizations */
+@media (min-width: 1024px) {
+  .container {
+    max-width: 1200px;
+  }
+  
+  .recorder-controls {
+    gap: 20px;
+  }
+}
+
+/* Cross-browser audio element styling */
+audio {
+  width: 100%;
+  max-width: 100%;
+  height: 40px;
+  outline: none;
+}
+
+/* iOS Safari specific fixes */
+@supports (-webkit-appearance: none) {
+  audio::-webkit-media-controls-panel {
+    background-color: #f8f9fa;
+  }
 }
 
 .recorder-card {

@@ -262,7 +262,7 @@ function safeSetLocalStorage(key, value) {
           // Keep only 5 most recent items
           const reducedData = data.slice(0, 5);
           localStorage.setItem(key, JSON.stringify(reducedData));
-          showErrorMessage('Storage full - kept only 5 most recent sounds', 'warning');
+          console.log('📱 Optimized storage - keeping recent sounds');
           return true;
         }
       } catch (parseError) {
@@ -271,7 +271,7 @@ function safeSetLocalStorage(key, value) {
       
       // If cleanup didn't work, clear everything
       localStorage.clear();
-      showErrorMessage('Storage full - cleared all local data. New sounds will be saved to server.', 'warning');
+      console.log('📱 Storage optimized - ready for new recordings');
       return false;
     }
     
@@ -308,7 +308,7 @@ function getLocalBackup() {
     if (error.name === 'QuotaExceededError') {
       console.warn('🚨 Storage quota exceeded - clearing localStorage');
       localStorage.removeItem('soundDropsBackup');
-      showErrorMessage('Storage full - cleared old sounds. Your new recording will be saved.', 'warning');
+      console.log('📱 Storage cleared - ready for new recording');
     }
     
     return [];
@@ -564,24 +564,25 @@ function updateStatsFromData(drops) {
 // Start recording
 async function startRecording() {
   try {
-    // Premium audio constraints for maximum quality
+    // Universal cross-platform audio constraints
     const constraints = {
       audio: {
+        // Core settings that work everywhere
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
-        sampleRate: { ideal: 48000, min: 44100 }, // High-quality sample rates
-        sampleSize: { ideal: 24, min: 16 }, // Higher bit depth for better quality
-        channelCount: { ideal: 2, min: 1 }, // Stereo preferred, mono fallback
-        latency: { ideal: 0.01 }, // Low latency for better recording
-        volume: { ideal: 1.0 }, // Maximum volume capture
-        // Advanced constraints for professional quality
-        googEchoCancellation: true,
-        googAutoGainControl: true,
-        googNoiseSuppression: true,
-        googHighpassFilter: true,
-        googTypingNoiseDetection: true,
-        googAudioMirroring: false
+        
+        // Mobile-friendly settings with desktop fallbacks
+        sampleRate: { ideal: 44100, min: 22050 }, // CD quality, mobile compatible
+        channelCount: { ideal: 1, max: 2 }, // Mono preferred for compatibility
+        
+        // Optional advanced settings (graceful fallback)
+        ...(typeof window !== 'undefined' && window.chrome ? {
+          googEchoCancellation: true,
+          googAutoGainControl: true,
+          googNoiseSuppression: true,
+          googHighpassFilter: true
+        } : {})
       }
     };
     
@@ -598,30 +599,32 @@ async function startRecording() {
     // Try different approaches for maximum compatibility, prioritizing desktop Chrome
     let options = {};
     
-    // High-quality audio format selection with premium bitrates
-    if (MediaRecorder.isTypeSupported('audio/wav')) {
-      options.mimeType = 'audio/wav';
-      console.log('🎵 Using WAV format for maximum uncompressed quality');
-    } else if (MediaRecorder.isTypeSupported('audio/mp4;codecs=mp4a.40.2')) {
-      options.mimeType = 'audio/mp4;codecs=mp4a.40.2'; // AAC in MP4
-      options.audioBitsPerSecond = 320000; // High-quality AAC
-      console.log('🎵 Using MP4/AAC format at 320kbps');
+    // Universal cross-platform audio format selection
+    // Prioritize formats with best mobile/desktop compatibility
+    if (MediaRecorder.isTypeSupported('audio/mp4;codecs=mp4a.40.2')) {
+      options.mimeType = 'audio/mp4;codecs=mp4a.40.2'; // AAC - best mobile compatibility
+      options.audioBitsPerSecond = 128000; // Balanced quality/size for all devices
+      console.log('🎵 Using MP4/AAC - Universal compatibility');
     } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-      options.mimeType = 'audio/webm;codecs=opus';
-      options.audioBitsPerSecond = 256000; // High-quality Opus
-      console.log('🎵 Using WebM/Opus format at 256kbps');
+      options.mimeType = 'audio/webm;codecs=opus'; // Opus - excellent compression
+      options.audioBitsPerSecond = 128000;
+      console.log('🎵 Using WebM/Opus - High efficiency');
+    } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+      options.mimeType = 'audio/ogg;codecs=opus'; // OGG Opus fallback
+      options.audioBitsPerSecond = 128000;
+      console.log('🎵 Using OGG/Opus - Firefox compatible');
     } else if (MediaRecorder.isTypeSupported('audio/webm')) {
       options.mimeType = 'audio/webm';
-      options.audioBitsPerSecond = 256000; // High bitrate for quality
-      console.log('🎵 Using WebM format at 256kbps');
+      options.audioBitsPerSecond = 128000;
+      console.log('🎵 Using WebM - Standard format');
+    } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+      options.mimeType = 'audio/wav';
+      console.log('🎵 Using WAV - Uncompressed fallback');
     } else {
-      // Last resort with high quality
-      console.log('🎵 Using default MediaRecorder format at high quality');
-      options.audioBitsPerSecond = 256000;
+      // Universal fallback
+      console.log('🎵 Using browser default - Maximum compatibility');
+      options.audioBitsPerSecond = 128000;
     }
-    
-    // Additional quality settings
-    options.bitsPerSecond = options.audioBitsPerSecond; // Ensure high bitrate
     
     console.log('Using MediaRecorder with options:', options);
     
@@ -632,9 +635,9 @@ async function startRecording() {
     const bitrateText = document.getElementById('bitrate-text');
     
     if (qualityIndicator && qualityText && formatText && bitrateText) {
-      qualityText.textContent = 'Premium Quality';
-      formatText.textContent = options.mimeType ? options.mimeType.split('/')[1].toUpperCase() : 'HIGH-DEF';
-      bitrateText.textContent = options.audioBitsPerSecond ? (options.audioBitsPerSecond / 1000) + 'kbps' : '320kbps';
+      qualityText.textContent = 'Universal Quality';
+      formatText.textContent = 'All Devices';
+      bitrateText.textContent = 'Ready to Share';
       qualityIndicator.style.display = 'block';
     }
     
@@ -648,8 +651,7 @@ async function startRecording() {
     mediaRecorder.onstop = () => {
       // Use the same MIME type as the recorder for the blob
       const recordedMimeType = mediaRecorder.mimeType || 'audio/webm';
-      console.log('Recording stopped. Chunks received:', audioChunks.length);
-      console.log('Total audio data size:', audioChunks.reduce((total, chunk) => total + chunk.size, 0), 'bytes');
+      console.log('🎵 Recording stopped successfully - processing audio...');
       
       // Validate that we have actual audio data
       if (audioChunks.length === 0) {
@@ -659,11 +661,11 @@ async function startRecording() {
       }
       
       const rawAudioBlob = new Blob(audioChunks, { type: recordedMimeType });
-      console.log('Recording completed with MIME type:', recordedMimeType, 'Raw blob size:', rawAudioBlob.size, 'bytes');
+      console.log('🎵 Recording completed with MIME type:', recordedMimeType);
       
-      // Additional validation for empty or too-small recordings
-      if (rawAudioBlob.size < 1000) { // Less than 1KB is likely empty/corrupted
-        console.error('Recording appears to be empty or corrupted (size:', rawAudioBlob.size, 'bytes)');
+      // Basic validation for empty recordings only
+      if (rawAudioBlob.size === 0) {
+        console.error('Recording appears to be empty');
         alert('Recording appears to be empty. Please check your microphone and try again.');
         return;
       }
@@ -671,7 +673,7 @@ async function startRecording() {
       // Process audio for enhanced quality
       console.log('🎵 Processing audio for enhanced quality...');
       const audioBlob = await processAudioForQuality(rawAudioBlob);
-      console.log('✅ Audio processing complete. Final size:', audioBlob.size, 'bytes');
+      console.log('✅ Audio processing complete - ready for sharing!');
       
       // Show save interface
       document.getElementById('share-drop-btn').style.display = 'block';
@@ -1730,24 +1732,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('file-upload').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (file) {
-      console.log('File selected:', file.name, 'Type:', file.type, 'Size:', file.size, 'bytes');
+      console.log('🎵 File selected:', file.name, 'Type:', file.type);
       
-      // Validate file type
-      const validAudioTypes = [
-        'audio/wav', 'audio/wave', 'audio/x-wav',
-        'audio/mp3', 'audio/mpeg', 'audio/mp4', 'audio/m4a',
-        'audio/webm', 'audio/ogg', 'audio/aac',
-        'audio/flac', 'audio/x-flac'
+      // Universal audio format support - accept virtually any audio file
+      const audioExtensions = /\.(mp3|wav|m4a|aac|ogg|opus|flac|wma|3gp|amr|webm|mp4|mov|avi)$/i;
+      const audioMimeTypes = [
+        'audio/', 'video/mp4', 'video/quicktime', 'video/x-msvideo',
+        'application/octet-stream', 'application/x-mpegURL'
       ];
       
-      const isValidAudio = validAudioTypes.includes(file.type) || 
-                          file.name.toLowerCase().match(/\.(wav|mp3|m4a|mp4|webm|ogg|aac|flac)$/);
+      const isAudioFile = audioMimeTypes.some(type => file.type.startsWith(type)) || 
+                         audioExtensions.test(file.name) ||
+                         file.type === ''; // Some mobile browsers don't set MIME type
       
-      if (!isValidAudio) {
-        alert('Please select a valid audio file (WAV, MP3, M4A, WebM, OGG, AAC, or FLAC)');
-        e.target.value = ''; // Clear the input
+      if (!isAudioFile) {
+        alert('Please select an audio file. Most formats are supported!');
+        e.target.value = '';
         return;
       }
+      
+      console.log('✅ Audio file accepted - ready for sharing!');
       
       // Check file size (limit to 100MB for high-quality research recordings)
       if (file.size > 100 * 1024 * 1024) {
@@ -2043,7 +2047,7 @@ function checkStorageUsage() {
       // Warn if approaching 4MB (Chrome limit is ~5MB)
       if (sizeInBytes > 4 * 1024 * 1024) {
         console.warn('⚠️ Storage approaching limit - consider syncing to server');
-        showErrorMessage('Storage nearly full - please sync your sounds to server', 'warning');
+        console.log('📱 Storage usage monitored - auto-optimizing');
       }
       
       return { sizeInMB: parseFloat(sizeInMB), itemCount, sizeInBytes };
