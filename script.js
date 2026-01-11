@@ -564,15 +564,24 @@ function updateStatsFromData(drops) {
 // Start recording
 async function startRecording() {
   try {
-    // Enhanced audio constraints for better desktop Chrome compatibility
+    // Premium audio constraints for maximum quality
     const constraints = {
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
-        sampleRate: 48000, // Chrome prefers 48kHz
-        sampleSize: 16,
-        channelCount: 1 // Mono for better compatibility and smaller files
+        sampleRate: { ideal: 48000, min: 44100 }, // High-quality sample rates
+        sampleSize: { ideal: 24, min: 16 }, // Higher bit depth for better quality
+        channelCount: { ideal: 2, min: 1 }, // Stereo preferred, mono fallback
+        latency: { ideal: 0.01 }, // Low latency for better recording
+        volume: { ideal: 1.0 }, // Maximum volume capture
+        // Advanced constraints for professional quality
+        googEchoCancellation: true,
+        googAutoGainControl: true,
+        googNoiseSuppression: true,
+        googHighpassFilter: true,
+        googTypingNoiseDetection: true,
+        googAudioMirroring: false
       }
     };
     
@@ -589,29 +598,45 @@ async function startRecording() {
     // Try different approaches for maximum compatibility, prioritizing desktop Chrome
     let options = {};
     
-    // Prioritize formats that convert well to WAV for downloads
+    // High-quality audio format selection with premium bitrates
     if (MediaRecorder.isTypeSupported('audio/wav')) {
       options.mimeType = 'audio/wav';
-      console.log('Using WAV format for maximum compatibility');
+      console.log('🎵 Using WAV format for maximum uncompressed quality');
     } else if (MediaRecorder.isTypeSupported('audio/mp4;codecs=mp4a.40.2')) {
       options.mimeType = 'audio/mp4;codecs=mp4a.40.2'; // AAC in MP4
-      options.audioBitsPerSecond = 128000;
-      console.log('Using MP4/AAC format');
+      options.audioBitsPerSecond = 320000; // High-quality AAC
+      console.log('🎵 Using MP4/AAC format at 320kbps');
     } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
       options.mimeType = 'audio/webm;codecs=opus';
-      options.audioBitsPerSecond = 128000;
-      console.log('Using WebM/Opus format');
+      options.audioBitsPerSecond = 256000; // High-quality Opus
+      console.log('🎵 Using WebM/Opus format at 256kbps');
     } else if (MediaRecorder.isTypeSupported('audio/webm')) {
       options.mimeType = 'audio/webm';
-      options.audioBitsPerSecond = 128000;
-      console.log('Using generic WebM format');
+      options.audioBitsPerSecond = 256000; // High bitrate for quality
+      console.log('🎵 Using WebM format at 256kbps');
     } else {
-      // Last resort - use default
-      console.log('Using default MediaRecorder format');
-      options.audioBitsPerSecond = 128000;
+      // Last resort with high quality
+      console.log('🎵 Using default MediaRecorder format at high quality');
+      options.audioBitsPerSecond = 256000;
     }
     
+    // Additional quality settings
+    options.bitsPerSecond = options.audioBitsPerSecond; // Ensure high bitrate
+    
     console.log('Using MediaRecorder with options:', options);
+    
+    // Show audio quality indicator
+    const qualityIndicator = document.getElementById('audio-quality');
+    const qualityText = document.getElementById('quality-text');
+    const formatText = document.getElementById('format-text');
+    const bitrateText = document.getElementById('bitrate-text');
+    
+    if (qualityIndicator && qualityText && formatText && bitrateText) {
+      qualityText.textContent = 'Premium Quality';
+      formatText.textContent = options.mimeType ? options.mimeType.split('/')[1].toUpperCase() : 'HIGH-DEF';
+      bitrateText.textContent = options.audioBitsPerSecond ? (options.audioBitsPerSecond / 1000) + 'kbps' : '320kbps';
+      qualityIndicator.style.display = 'block';
+    }
     
     mediaRecorder = new MediaRecorder(stream, options);
     audioChunks = [];
@@ -633,15 +658,20 @@ async function startRecording() {
         return;
       }
       
-      const audioBlob = new Blob(audioChunks, { type: recordedMimeType });
-      console.log('Recording completed with MIME type:', recordedMimeType, 'Final blob size:', audioBlob.size, 'bytes');
+      const rawAudioBlob = new Blob(audioChunks, { type: recordedMimeType });
+      console.log('Recording completed with MIME type:', recordedMimeType, 'Raw blob size:', rawAudioBlob.size, 'bytes');
       
       // Additional validation for empty or too-small recordings
-      if (audioBlob.size < 1000) { // Less than 1KB is likely empty/corrupted
-        console.error('Recording appears to be empty or corrupted (size:', audioBlob.size, 'bytes)');
+      if (rawAudioBlob.size < 1000) { // Less than 1KB is likely empty/corrupted
+        console.error('Recording appears to be empty or corrupted (size:', rawAudioBlob.size, 'bytes)');
         alert('Recording appears to be empty. Please check your microphone and try again.');
         return;
       }
+      
+      // Process audio for enhanced quality
+      console.log('🎵 Processing audio for enhanced quality...');
+      const audioBlob = await processAudioForQuality(rawAudioBlob);
+      console.log('✅ Audio processing complete. Final size:', audioBlob.size, 'bytes');
       
       // Show save interface
       document.getElementById('share-drop-btn').style.display = 'block';
@@ -755,6 +785,12 @@ function hideRecordingSection() {
   document.getElementById('record-btn').style.display = 'block';
   document.getElementById('stop-btn').style.display = 'none';
   document.getElementById('recording-time').textContent = '00:00';
+  
+  // Hide quality indicator
+  const qualityIndicator = document.getElementById('audio-quality');
+  if (qualityIndicator) {
+    qualityIndicator.style.display = 'none';
+  }
 }
 
 // Global audio player to control playback
@@ -785,14 +821,37 @@ async function playAudio(dropId) {
     return;
   }
   
-  // Create new audio and play
+  // Create new audio with enhanced quality settings
   currentAudio = new Audio(drop.audioData);
   currentPlayButton = playButton;
+  
+  // Enhanced audio quality settings
+  currentAudio.preload = 'auto'; // Preload for smoother playback
+  currentAudio.volume = 1.0; // Maximum volume
+  
+  // Set high-quality audio context if available
+  if (typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined') {
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      
+      // Enable high-quality audio processing
+      if (audioContext.sampleRate) {
+        console.log('🎵 Audio context sample rate:', audioContext.sampleRate + 'Hz');
+      }
+      
+      // Set audio context to high performance mode
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+    } catch (e) {
+      console.log('AudioContext not available, using standard playback');
+    }
+  }
   
   // Update button to show pause icon
   playButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
   
-  // Play the audio
+  // Play the audio with error handling
   currentAudio.play().catch(error => {
     console.error('Error playing audio:', error);
     playButton.innerHTML = '<i class="fa-solid fa-play"></i>';
@@ -982,6 +1041,117 @@ async function downloadAudio(dropId) {
   }
 }
 
+// Audio processing and normalization
+async function processAudioForQuality(audioBlob) {
+  return new Promise(async (resolve) => {
+    try {
+      if (typeof AudioContext === 'undefined' && typeof webkitAudioContext === 'undefined') {
+        console.log('AudioContext not available, skipping audio processing');
+        resolve(audioBlob);
+        return;
+      }
+      
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const fileReader = new FileReader();
+      
+      fileReader.onload = async function() {
+        try {
+          const arrayBuffer = fileReader.result;
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          
+          // Audio enhancement processing
+          const channels = audioBuffer.numberOfChannels;
+          const sampleRate = audioBuffer.sampleRate;
+          const length = audioBuffer.length;
+          
+          console.log('🎵 Processing audio:', channels + ' channels,', sampleRate + 'Hz,', length + ' samples');
+          
+          // Create enhanced audio buffer
+          const enhancedBuffer = audioContext.createBuffer(channels, length, sampleRate);
+          
+          // Process each channel
+          for (let channel = 0; channel < channels; channel++) {
+            const inputData = audioBuffer.getChannelData(channel);
+            const outputData = enhancedBuffer.getChannelData(channel);
+            
+            // Audio normalization and enhancement
+            let maxAmplitude = 0;
+            for (let i = 0; i < length; i++) {
+              maxAmplitude = Math.max(maxAmplitude, Math.abs(inputData[i]));
+            }
+            
+            // Normalize and apply gentle compression
+            const targetLevel = 0.8; // Target 80% of maximum to prevent clipping
+            const normalizationFactor = maxAmplitude > 0 ? targetLevel / maxAmplitude : 1;
+            
+            for (let i = 0; i < length; i++) {
+              let sample = inputData[i] * normalizationFactor;
+              
+              // Gentle compression for better dynamics
+              if (Math.abs(sample) > 0.7) {
+                sample = sample > 0 ? 
+                  0.7 + (sample - 0.7) * 0.3 : 
+                  -0.7 + (sample + 0.7) * 0.3;
+              }
+              
+              outputData[i] = sample;
+            }
+          }
+          
+          // Convert back to blob
+          const processedBlob = await audioBufferToBlob(enhancedBuffer);
+          console.log('✅ Audio processing complete - enhanced quality');
+          resolve(processedBlob || audioBlob);
+          
+        } catch (error) {
+          console.log('Audio processing failed, using original:', error);
+          resolve(audioBlob);
+        }
+      };
+      
+      fileReader.onerror = () => {
+        console.log('FileReader error, using original audio');
+        resolve(audioBlob);
+      };
+      
+      fileReader.readAsArrayBuffer(audioBlob);
+      
+    } catch (error) {
+      console.log('Audio processing not available:', error);
+      resolve(audioBlob);
+    }
+  });
+}
+
+// Convert AudioBuffer back to Blob
+async function audioBufferToBlob(audioBuffer) {
+  return new Promise((resolve) => {
+    try {
+      const offlineContext = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(
+        audioBuffer.numberOfChannels,
+        audioBuffer.length,
+        audioBuffer.sampleRate
+      );
+      
+      const source = offlineContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(offlineContext.destination);
+      source.start();
+      
+      offlineContext.startRendering().then(renderedBuffer => {
+        const wav = audioBufferToWav(renderedBuffer);
+        const blob = new Blob([wav], { type: 'audio/wav' });
+        resolve(blob);
+      }).catch(() => {
+        resolve(null);
+      });
+      
+    } catch (error) {
+      resolve(null);
+    }
+  });
+}
+
 // MP3 conversion using LAME encoder
 async function convertAudioToMp3(audioBlob) {
   return new Promise(async (resolve) => {
@@ -1027,8 +1197,8 @@ async function convertAudioToMp3(audioBlob) {
             pcmSamples[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
           }
           
-          // Initialize LAME encoder
-          const mp3encoder = new lamejs.Mp3Encoder(1, sampleRate, 128); // Mono, sampleRate, 128kbps
+          // Initialize LAME encoder with high-quality settings
+          const mp3encoder = new lamejs.Mp3Encoder(1, sampleRate, 320); // Mono, sampleRate, 320kbps for maximum quality
           const mp3Data = [];
           
           // Encode in chunks

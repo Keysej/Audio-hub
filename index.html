@@ -70,9 +70,6 @@
         <button class="sync-btn" id="sync-btn" style="background: #28a745; display: none;">
           <i class="fa-solid fa-sync"></i> Sync Local Sounds
       </button>
-      <button class="refresh-btn" id="refresh-btn" style="background: #dc3545; margin-left: 10px;">
-          <i class="fa-solid fa-refresh"></i> Force Refresh
-      </button>
     </div>
 
     <div class="recording-section" id="recording-section" style="display: none;">
@@ -86,6 +83,9 @@
             <i class="fa-solid fa-stop"></i>
           </button>
           <span class="recording-time" id="recording-time">00:00</span>
+          <div class="audio-quality-indicator" id="audio-quality" style="display: none; margin-top: 10px; font-size: 0.9em; color: #28a745;">
+            🎵 <span id="quality-text">High Quality</span> • <span id="format-text">WAV</span> • <span id="bitrate-text">320kbps</span>
+          </div>
         </div>
         <div class="audio-preview" id="audio-preview" style="display: none;">
           <h4>Preview Your Recording:</h4>

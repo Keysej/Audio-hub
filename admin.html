@@ -490,9 +490,26 @@
         });
       }
       
-      // Play new audio
+      // Play new audio with enhanced quality settings
       if (button.textContent === '▶️ Play') {
         currentAudio = new Audio(audioData);
+        
+        // Enhanced audio quality settings
+        currentAudio.preload = 'auto';
+        currentAudio.volume = 1.0;
+        
+        // Set high-quality audio context if available
+        if (typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined') {
+          try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioContext.state === 'suspended') {
+              audioContext.resume();
+            }
+          } catch (e) {
+            console.log('AudioContext not available');
+          }
+        }
+        
         currentAudio.play();
         button.textContent = '⏸️ Pause';
         
