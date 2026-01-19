@@ -1662,8 +1662,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
   
-  // File upload
-    document.getElementById('file-upload').addEventListener('change', handleFileUpload);
+  // File upload handler is defined below in the main initialization
     
     // Force refresh button removed - auto-sync handles everything
     
