@@ -648,7 +648,7 @@ async function startRecording() {
       audioChunks.push(event.data);
     };
     
-    mediaRecorder.onstop = () => {
+    mediaRecorder.onstop = async () => {
       // Use the same MIME type as the recorder for the blob
       const recordedMimeType = mediaRecorder.mimeType || 'audio/webm';
       console.log('🎵 Recording stopped successfully - processing audio...');
