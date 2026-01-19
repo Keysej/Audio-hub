@@ -1121,7 +1121,7 @@ def create_sound_drop():
             'type': data.get('type', 'recorded'),
             'filename': data.get('filename', f"recording_{drop_timestamp}"),
             'discussions': [],
-            'applauds': []  # Initialize as empty array, not 0
+            'applauds': 0  # Initialize as number for counting
         }
         
         # Load existing drops and check for duplicates
@@ -1183,9 +1183,12 @@ def toggle_applaud(drop_id):
         if not target_drop:
             return jsonify({'error': 'Sound drop not found'}), 404
         
-        # Initialize applauds if not exists
+        # Initialize applauds if not exists or fix array format
         if 'applauds' not in target_drop:
             target_drop['applauds'] = 0
+        elif isinstance(target_drop['applauds'], list):
+            # Fix old array format - convert to count
+            target_drop['applauds'] = len(target_drop['applauds'])
         
         # Reasonable applaud limits for research integrity
         if applaud and target_drop['applauds'] >= 100:
