@@ -2,7 +2,7 @@
 
 ## Primary Domain (Use This One)
 
-**Production Domain:** `audio-hub-ten.vercel.app`
+**Production Domain:** `audio-hub-lyart.vercel.app`
 
 This is your main production domain connected to GitHub. Always use this domain to access your application.
 
