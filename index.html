@@ -18,8 +18,8 @@
     // Ensure we're using the production domain (GitHub-connected)
     // Redirect any other Vercel domains to the production domain
     (function() {
-      // Use the domain shown in GitHub About section (this is the actual production domain)
-      const productionDomain = 'audio-hub-lyart.vercel.app';
+      // Use the working production domain (verified: returns HTTP 200)
+      const productionDomain = 'audio-hub-ten.vercel.app';
       const currentHost = window.location.hostname;
       
       // Only redirect if we're on a Vercel domain but not the production one
