@@ -315,114 +315,102 @@ function getLocalBackup() {
   }
 }
 
-// Save sound drop to shared API
+// ====== SIMPLIFIED SAVE FUNCTION - REBUILT FROM SCRATCH ======
 async function saveSoundDrop(audioBlob, context, type, filename) {
-  console.log('Saving sound drop:', { type, filename, context });
-  const reader = new FileReader();
+  console.log('💾 ====== SAVING SOUND DROP ======');
+  console.log('💾 Type:', type, 'Filename:', filename);
   
-  reader.onload = async function() {
-    try {
-      const dropData = {
-        audioData: reader.result,
-        context: context || '',
-        type: type, // 'recorded' or 'uploaded'
-        filename: filename || `recording_${Date.now()}`
-      };
-      
-      console.log('Sending to API:', dropData);
-      
-      const response = await fetch('/api/sound-drops', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(dropData)
-      });
-      
-      console.log('API response status:', response.status);
-      
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Sound drop saved successfully:', result);
-        
-        // Add to localStorage backup immediately
-        const backup = getLocalBackup();
-        backup.unshift(result.drop);
-        safeSetLocalStorage('soundDropsBackup', JSON.stringify(backup));
-        
-        // Also try to save to backup service for cross-device sharing
-        await saveToBackupService(backup);
-        
-        const freshData = await getSoundDrops();
-        renderSoundDropsFromData(freshData);
-        updateStatsFromData(freshData);
-      } else {
-        const errorText = await response.text();
-        console.error('❌ UPLOAD FAILED:', response.status, errorText);
-        
-        // Show user-friendly error message
-        alert(`Upload failed (${response.status}): ${errorText}\n\nYour sound has been saved locally and will sync when the server is available.`);
-        
-        // Fallback: save to localStorage only
-        console.log('💾 Saving to localStorage as fallback');
-        const fallbackTheme = await getTodaysTheme();
-    const drop = {
-      id: Date.now(),
-      timestamp: Date.now(),
-      theme: fallbackTheme.title,
-      audioData: reader.result,
-      context: context || '',
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = async function() {
+      try {
+        const dropData = {
+          audioData: reader.result,
+          context: context || '',
           type: type,
-      filename: filename || `recording_${Date.now()}`,
-      discussions: [],
-      applauds: 0
-    };
-    
-        const backup = getLocalBackup();
-        backup.unshift(drop);
-        safeSetLocalStorage('soundDropsBackup', JSON.stringify(backup));
+          filename: filename || `recording_${Date.now()}`
+        };
         
-        // Also try to save to backup service for cross-device sharing
-        await saveToBackupService(backup);
+        console.log('📤 Sending to API...');
         
-        const freshData = getLocalBackup();
-        renderSoundDropsFromData(freshData);
-        updateStatsFromData(freshData);
+        const response = await fetch('/api/sound-drops', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(dropData)
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('✅ API save successful:', result);
+          
+          // Save to localStorage immediately
+          const backup = getLocalBackup();
+          backup.unshift(result.drop);
+          safeSetLocalStorage('soundDropsBackup', JSON.stringify(backup));
+          
+          console.log('✅ Saved to localStorage, file ID:', result.drop.id);
+          resolve(result.drop);
+          
+        } else {
+          // API failed - save locally
+          const errorText = await response.text();
+          console.warn('⚠️ API failed, saving locally:', errorText);
+          
+          const theme = await getTodaysTheme();
+          const drop = {
+            id: Date.now(),
+            timestamp: Date.now(),
+            theme: theme.title,
+            audioData: reader.result,
+            context: context || '',
+            type: type,
+            filename: filename || `recording_${Date.now()}`,
+            discussions: []
+          };
+          
+          const backup = getLocalBackup();
+          backup.unshift(drop);
+          safeSetLocalStorage('soundDropsBackup', JSON.stringify(backup));
+          
+          console.log('✅ Saved locally, file ID:', drop.id);
+          resolve(drop);
+        }
+      } catch (error) {
+        console.error('❌ Save error:', error);
+        
+        // Network error - save locally anyway
+        getTodaysTheme().then(async (theme) => {
+          const drop = {
+            id: Date.now(),
+            timestamp: Date.now(),
+            theme: theme.title,
+            audioData: reader.result,
+            context: context || '',
+            type: type,
+            filename: filename || `recording_${Date.now()}`,
+            discussions: []
+          };
+          
+          const backup = getLocalBackup();
+          backup.unshift(drop);
+          safeSetLocalStorage('soundDropsBackup', JSON.stringify(backup));
+          
+          console.log('✅ Saved locally after network error, file ID:', drop.id);
+          resolve(drop);
+        });
       }
-    } catch (error) {
-      console.error('🚨 NETWORK ERROR:', error);
-      
-      // Show user-friendly error message
-      alert(`Network error: ${error.message}\n\nYour sound has been saved locally and will sync when connection is restored.`);
-      
-      // Network error fallback: save to localStorage only
-      console.log('💾 Network error - saving to localStorage as fallback');
-      const fallbackTheme = await getTodaysTheme();
-    const drop = {
-      id: Date.now(),
-      timestamp: Date.now(),
-      theme: fallbackTheme.title,
-      audioData: reader.result,
-      context: context || '',
-        type: type,
-      filename: filename || `recording_${Date.now()}`,
-      discussions: [],
-      applauds: 0
     };
     
-      const backup = getLocalBackup();
-      backup.unshift(drop);
-      safeSetLocalStorage('soundDropsBackup', JSON.stringify(backup));
-      
-      // Also try to save to backup service for cross-device sharing
-      await saveToBackupService(backup);
-      
-      await renderSoundDrops();
-      await updateStats();
-    }
-  };
-  
-  reader.readAsDataURL(audioBlob);
+    reader.onerror = () => {
+      console.error('❌ FileReader error');
+      reject(new Error('Failed to read file'));
+    };
+    
+    reader.readAsDataURL(audioBlob);
+  });
 }
 
 // Render sound drops
@@ -437,22 +425,43 @@ function renderSoundDropsFromData(drops, filter = 'all') {
   const container = document.getElementById('sound-drops');
   
   let filteredDrops = drops;
-  if (filter === 'recorded') filteredDrops = drops.filter(d => d.type === 'recorded');
-  if (filter === 'uploaded') filteredDrops = drops.filter(d => d.type === 'uploaded');
-  if (filter === 'discussed') filteredDrops = drops.filter(d => d.discussions.length > 0);
+  if (filter === 'recorded') {
+    filteredDrops = drops.filter(d => d.type === 'recorded');
+  } else if (filter === 'uploaded') {
+    filteredDrops = drops.filter(d => d.type === 'uploaded');
+  } else if (filter === 'discussed') {
+    filteredDrops = drops.filter(d => d.discussions.length > 0);
   
   container.innerHTML = '';
   
-  filteredDrops.forEach(drop => {
-    // Check if user has applauded this drop
-    const hasApplauded = localStorage.getItem(`applaud_${drop.id}`) === 'true';
-    const applaudClass = hasApplauded ? 'applauded' : '';
+  console.log(`🖼️ Rendering ${filteredDrops.length} drops with filter: "${filter}"`);
+  
+  if (filteredDrops.length === 0) {
+    const emptyMessage = document.createElement('div');
+    emptyMessage.className = 'empty-message';
+    emptyMessage.style.cssText = 'text-align: center; padding: 40px; color: #666; font-size: 1.1em;';
+    emptyMessage.innerHTML = `
+      <p style="margin-bottom: 10px;">No sounds found for this filter.</p>
+      <p>Try switching to <strong>"All Drops"</strong> to see all sounds.</p>
+    `;
+    container.appendChild(emptyMessage);
+    return;
+  }
+  
+  filteredDrops.forEach((drop, index) => {
+    console.log(`  📦 Drop ${index + 1}: ID=${drop.id}, type=${drop.type}, filename="${drop.filename || 'N/A'}"`);
     
     const dropEl = document.createElement('div');
     dropEl.className = 'sound-drop';
+    
+    // Show filename for uploaded/recorded files
+    const filenameDisplay = (drop.filename && drop.type !== 'link') ? 
+      `<div class="drop-filename"><i class="fa-solid fa-file-audio"></i> ${drop.filename}</div>` : '';
+    
     dropEl.innerHTML = `
       <div class="drop-header">
         <div class="drop-type">${drop.type}</div>
+        ${filenameDisplay}
       </div>
       ${drop.type === 'link' ? 
         `<div class="link-preview">
@@ -461,24 +470,37 @@ function renderSoundDropsFromData(drops, filter = 'all') {
         </div>` : 
         `<div class="waveform"></div>
       <div class="drop-controls">
-        <button class="play-btn" onclick="playAudio('${drop.id}')">
+        <button class="play-btn" onclick="playAudio('${drop.id}')" title="Click to play audio">
           <i class="fa-solid fa-play"></i>
+          <span class="play-label">Play</span>
         </button>
-        <span>Theme: ${drop.theme}</span>
+        <span class="theme-label">Theme: ${drop.theme}</span>
          </div>`
       }
       ${drop.context ? `<div class="drop-context">"${drop.context}"</div>` : ''}
       <div class="drop-actions">
-        <button class="applaud-btn ${applaudClass}" onclick="toggleApplaud('${drop.id}')" data-drop-id="${drop.id}">
-          <i class="fa-solid fa-hands-clapping"></i> <span class="applaud-count">${drop.applauds || 0}</span>
-        </button>
         <button class="discuss-btn" onclick="openDiscussion('${drop.id}')">
           <i class="fa-solid fa-comment"></i> Discuss (${drop.discussions.length})
         </button>
       </div>
     `;
     container.appendChild(dropEl);
+    
+    // If this is the first drop (most recent), scroll it into view
+    if (index === 0 && filteredDrops.length > 0) {
+      setTimeout(() => {
+        dropEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 100);
+    }
   });
+  
+  console.log(`✅ Finished rendering ${filteredDrops.length} drops - they should now be visible on the page`);
+  
+  // Ensure container is visible
+  if (container && filteredDrops.length > 0) {
+    container.style.display = 'block';
+    container.style.visibility = 'visible';
+  }
 }
 
 // Simplified - no individual timers needed, only unified countdown
@@ -563,6 +585,7 @@ function updateStatsFromData(drops) {
 
 // Start recording
 async function startRecording() {
+  console.log('🎤 Start recording called');
   try {
     // Universal cross-platform audio constraints
     const constraints = {
@@ -723,7 +746,7 @@ async function startRecording() {
     recordingInterval = setInterval(updateRecordingTime, 1000);
     
   } catch (error) {
-    console.error('Error accessing microphone:', error);
+    console.error('❌ Error accessing microphone:', error);
     
     // Provide more specific error messages for different scenarios
     let errorMessage = 'Could not access microphone. ';
@@ -738,11 +761,16 @@ async function startRecording() {
     }
     
     alert(errorMessage);
+    showNotification(errorMessage, 'error');
     
     // Reset UI on error
-    document.getElementById('record-btn').style.display = 'block';
-    document.getElementById('stop-btn').style.display = 'none';
-    document.getElementById('recording-time').textContent = '00:00';
+    const recordBtn = document.getElementById('record-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const recordingTime = document.getElementById('recording-time');
+    
+    if (recordBtn) recordBtn.style.display = 'block';
+    if (stopBtn) stopBtn.style.display = 'none';
+    if (recordingTime) recordingTime.textContent = '00:00';
   }
 }
 
@@ -772,9 +800,24 @@ function updateRecordingTime() {
 
 // Show recording section
 async function showRecordingSection() {
-  document.getElementById('recording-section').style.display = 'block';
-  const currentTheme = await getTodaysTheme();
-  document.getElementById('recording-theme').textContent = currentTheme.title;
+  try {
+    const recordingSection = document.getElementById('recording-section');
+    if (!recordingSection) {
+      console.error('Recording section element not found');
+      alert('Recording section not found. Please refresh the page.');
+      return;
+    }
+    
+    recordingSection.style.display = 'block';
+    const currentTheme = await getTodaysTheme();
+    const themeElement = document.getElementById('recording-theme');
+    if (themeElement) {
+      themeElement.textContent = currentTheme.title;
+    }
+  } catch (error) {
+    console.error('Error showing recording section:', error);
+    alert('Error opening recording section. Please try again.');
+  }
 }
 
 // Hide recording section
@@ -801,11 +844,20 @@ let currentPlayButton = null;
 
 // Play/pause audio with proper controls
 async function playAudio(dropId) {
+  // Convert dropId to number if it's a string (for comparison)
+  const dropIdNum = typeof dropId === 'string' ? parseInt(dropId, 10) : dropId;
+  
   const drops = await getSoundDrops();
-  const drop = drops.find(d => d.id == dropId);
+  const drop = drops.find(d => {
+    const dId = typeof d.id === 'string' ? parseInt(d.id, 10) : d.id;
+    return dId === dropIdNum;
+  });
   const playButton = document.querySelector(`button[onclick="playAudio('${dropId}')"]`);
   
-  if (!drop || !playButton) return;
+  if (!drop || !playButton) {
+    console.warn('Drop or play button not found for:', dropId);
+    return;
+  }
   
   // If there's already audio playing, stop it first
   if (currentAudio && !currentAudio.paused) {
@@ -1246,9 +1298,20 @@ async function convertAudioToMp3(audioBlob) {
 
 // Open discussion modal
 async function openDiscussion(dropId) {
+  // Convert dropId to number if it's a string (for comparison)
+  const dropIdNum = typeof dropId === 'string' ? parseInt(dropId, 10) : dropId;
+  
   const drops = await getSoundDrops();
-  const drop = drops.find(d => d.id == dropId);
-  if (!drop) return;
+  const drop = drops.find(d => {
+    const dId = typeof d.id === 'string' ? parseInt(d.id, 10) : d.id;
+    return dId === dropIdNum;
+  });
+  
+  if (!drop) {
+    console.warn('Drop not found for discussion:', dropId);
+    showNotification('Sound not found. It may have been removed.', 'warning');
+    return;
+  }
   
   // Create modal HTML
   const modal = document.createElement('div');
@@ -1331,103 +1394,22 @@ function renderComments(comments) {
   `).join('');
 }
 
-// Toggle applaud for a sound drop
-async function toggleApplaud(dropId) {
-  console.log('Toggling applaud for drop:', dropId);
-  
-  // Check applaud rate limit (max 15 applauds per minute for research)
-  const applaudLimitKey = 'applaud_rate_limit';
-  const now = Date.now();
-  const applaudHistory = JSON.parse(localStorage.getItem(applaudLimitKey) || '[]');
-  
-  // Remove applauds older than 1 minute
-  const recentApplauds = applaudHistory.filter(timestamp => now - timestamp < 60000);
-  
-  // Get current applaud state from localStorage
-  const applaudKey = `applaud_${dropId}`;
-  const hasApplauded = localStorage.getItem(applaudKey) === 'true';
-  
-  // Check if adding new applaud (not removing)
-  if (!hasApplauded) {
-    if (recentApplauds.length >= 15) {
-      showErrorMessage('Please slow down! You can applaud up to 15 sounds per minute. Take a moment to listen thoughtfully. 🎵', 'warning');
-      return;
-    }
-    recentApplauds.push(now);
-    localStorage.setItem(applaudLimitKey, JSON.stringify(recentApplauds));
-  }
-  
-  // Update localStorage
-  localStorage.setItem(applaudKey, (!hasApplauded).toString());
-  
-  // Update the drop data
-  const localDrops = getLocalBackup();
-  const dropIndex = localDrops.findIndex(d => d.id == dropId);
-  
-  if (dropIndex !== -1) {
-    // Initialize applauds if not exists
-    if (!localDrops[dropIndex].applauds) {
-      localDrops[dropIndex].applauds = 0;
-    }
-    
-    // Toggle applaud count
-    if (hasApplauded) {
-      localDrops[dropIndex].applauds = Math.max(0, localDrops[dropIndex].applauds - 1);
-      showNotification('Applaud removed', 'info');
-    } else {
-      localDrops[dropIndex].applauds += 1;
-      showNotification('👏 Applauded!', 'success');
-    }
-    
-    // Save to localStorage
-    safeSetLocalStorage('soundDropsBackup', JSON.stringify(localDrops));
-    
-    // Update UI immediately
-    const applaudBtn = document.querySelector(`button[data-drop-id="${dropId}"]`);
-    if (applaudBtn) {
-      const countSpan = applaudBtn.querySelector('.applaud-count');
-      if (countSpan) {
-        countSpan.textContent = localDrops[dropIndex].applauds;
-      }
-      
-      // Visual feedback
-      applaudBtn.style.transform = 'scale(1.2)';
-      setTimeout(() => {
-        applaudBtn.style.transform = 'scale(1)';
-      }, 150);
-      
-      // Update button style based on applaud state
-      if (!hasApplauded) {
-        applaudBtn.classList.add('applauded');
-      } else {
-        applaudBtn.classList.remove('applauded');
-      }
-    }
-    
-    // Update stats
-    updateStatsFromData(localDrops);
-    
-    // Try to sync with API in background
-    try {
-      const response = await fetch(`/api/sound-drops/${dropId}/applaud`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ applaud: !hasApplauded })
-      });
-      
-      if (response.ok) {
-        console.log('Applaud synced with API');
-      } else {
-        console.log('API applaud sync failed, but saved locally');
-      }
-    } catch (error) {
-      console.log('API applaud sync failed, but saved locally:', error.message);
-    }
-  }
-}
+
+// Make functions globally accessible for onclick handlers
+window.playAudio = playAudio;
+window.openDiscussion = openDiscussion;
+window.addComment = addComment;
+window.editComment = editComment;
+window.cancelCommentEdit = cancelCommentEdit;
+window.saveCommentEdit = saveCommentEdit;
+window.deleteComment = deleteComment;
+window.closeDiscussion = closeDiscussion;
 
 // Add comment to a sound drop
 async function addComment(dropId) {
+  // Convert dropId to number if it's a string (for comparison)
+  const dropIdNum = typeof dropId === 'string' ? parseInt(dropId, 10) : dropId;
+  
   const textarea = document.getElementById(`new-comment-${dropId}`);
   const commentText = textarea.value.trim();
   
@@ -1446,7 +1428,10 @@ async function addComment(dropId) {
   
   // First, add the comment locally for immediate feedback
   const localDrops = getLocalBackup();
-  const localDropIndex = localDrops.findIndex(d => d.id == dropId);
+  const localDropIndex = localDrops.findIndex(d => {
+    const dId = typeof d.id === 'string' ? parseInt(d.id, 10) : d.id;
+    return dId === dropIdNum;
+  });
   
   if (localDropIndex !== -1) {
     localDrops[localDropIndex].discussions.push(comment);
@@ -1581,18 +1566,6 @@ function cleanupOldData() {
         console.log(`Startup cleanup: Removed ${drops.length - validDrops.length} old drops from localStorage`);
         safeSetLocalStorage('soundDropsBackup', JSON.stringify(validDrops));
         
-        // Clean up applaud data for removed sounds
-        const validDropIds = new Set(validDrops.map(drop => drop.id));
-        for (let i = localStorage.length - 1; i >= 0; i--) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('applaud_')) {
-            const dropId = key.replace('applaud_', '');
-            if (!validDropIds.has(parseInt(dropId))) {
-              localStorage.removeItem(key);
-              console.log(`Cleaned up applaud data for removed sound: ${dropId}`);
-            }
-          }
-        }
       }
       
       // If no valid drops remain, clear localStorage completely
@@ -1642,15 +1615,49 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Set up event listeners IMMEDIATELY - don't wait for API
   console.log('🔧 Setting up event listeners...');
   try {
-  document.getElementById('drop-sound-btn').addEventListener('click', showRecordingSection);
-  document.getElementById('record-btn').addEventListener('click', startRecording);
-  document.getElementById('stop-btn').addEventListener('click', stopRecording);
-    document.getElementById('link-btn').addEventListener('click', showLinkModal);
-    document.getElementById('sync-btn').addEventListener('click', async () => {
-      document.getElementById('sync-btn').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing...';
-      await syncLocalSoundsToServer(true);
-      document.getElementById('sync-btn').innerHTML = '<i class="fa-solid fa-sync"></i> Sync Local Sounds';
-    });
+    const dropSoundBtn = document.getElementById('drop-sound-btn');
+    if (dropSoundBtn) {
+      dropSoundBtn.addEventListener('click', showRecordingSection);
+      console.log('✅ Drop sound button listener added');
+    } else {
+      console.error('❌ drop-sound-btn not found');
+    }
+    
+    const recordBtn = document.getElementById('record-btn');
+    if (recordBtn) {
+      recordBtn.addEventListener('click', startRecording);
+      console.log('✅ Record button listener added');
+    } else {
+      console.error('❌ record-btn not found');
+    }
+    
+    const stopBtn = document.getElementById('stop-btn');
+    if (stopBtn) {
+      stopBtn.addEventListener('click', stopRecording);
+      console.log('✅ Stop button listener added');
+    } else {
+      console.error('❌ stop-btn not found');
+    }
+    
+    const linkBtn = document.getElementById('link-btn');
+    if (linkBtn) {
+      linkBtn.addEventListener('click', showLinkModal);
+      console.log('✅ Link button listener added');
+    } else {
+      console.error('❌ link-btn not found');
+    }
+    
+    const syncBtn = document.getElementById('sync-btn');
+    if (syncBtn) {
+      syncBtn.addEventListener('click', async () => {
+        syncBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing...';
+        await syncLocalSoundsToServer(true);
+        syncBtn.innerHTML = '<i class="fa-solid fa-sync"></i> Sync Local Sounds';
+      });
+      console.log('✅ Sync button listener added');
+    } else {
+      console.error('❌ sync-btn not found');
+    }
   
   // Filter buttons
   document.querySelectorAll('.filter-tag').forEach(btn => {
@@ -1662,6 +1669,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
   
+  
   // File upload handler is defined below in the main initialization
     
     // Force refresh button removed - auto-sync handles everything
@@ -1669,6 +1677,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('✅ Event listeners set up successfully');
   } catch (error) {
     console.error('❌ Error setting up event listeners:', error);
+    alert('Error setting up buttons. Please refresh the page. Error: ' + error.message);
   }
   
   // ALWAYS show local data first for immediate loading - don't wait for API
@@ -1727,58 +1736,142 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Event listeners are now set up earlier in the initialization
   
-  // File upload handler (keeping this one as it has different logic)
-  document.getElementById('file-upload').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      console.log('🎵 File selected:', file.name, 'Type:', file.type);
+  // ====== SIMPLIFIED FILE UPLOAD HANDLER - REBUILT FROM SCRATCH ======
+  const fileUploadInput = document.getElementById('file-upload');
+  if (fileUploadInput) {
+    // Remove any existing listeners
+    const newInput = fileUploadInput.cloneNode(true);
+    fileUploadInput.parentNode.replaceChild(newInput, fileUploadInput);
+    
+    // Add fresh event listener
+    newInput.addEventListener('change', async function(e) {
+      console.log('📤 ====== FILE UPLOAD STARTED ======');
       
-      // Universal audio format support - accept virtually any audio file
+      const file = e.target.files[0];
+      if (!file) {
+        console.log('⚠️ No file selected');
+        return;
+      }
+      
+      console.log('📁 File selected:', file.name, 'Size:', (file.size / 1024 / 1024).toFixed(2), 'MB');
+      
+      // Validate file type
       const audioExtensions = /\.(mp3|wav|m4a|aac|ogg|opus|flac|wma|3gp|amr|webm|mp4|mov|avi)$/i;
-      const audioMimeTypes = [
-        'audio/', 'video/mp4', 'video/quicktime', 'video/x-msvideo',
-        'application/octet-stream', 'application/x-mpegURL'
-      ];
-      
-      const isAudioFile = audioMimeTypes.some(type => file.type.startsWith(type)) || 
+      const isAudioFile = file.type.startsWith('audio/') || 
+                         file.type.startsWith('video/') ||
                          audioExtensions.test(file.name) ||
-                         file.type === ''; // Some mobile browsers don't set MIME type
+                         file.type === '';
       
       if (!isAudioFile) {
-        alert('Please select an audio file. Most formats are supported!');
+        alert('Please select an audio file.');
         e.target.value = '';
         return;
       }
       
-      console.log('✅ Audio file accepted - ready for sharing!');
-      
-      // Check file size (limit to 100MB for high-quality research recordings)
+      // Check file size
       if (file.size > 100 * 1024 * 1024) {
-        alert('File is too large. Please select an audio file smaller than 100MB.\n\nTip: For best quality while staying under the limit:\n• WAV files: ~10MB per minute\n• MP3 files: ~1MB per minute\n• Consider recording at 44.1kHz, 16-bit for optimal quality/size balance');
-        e.target.value = ''; // Clear the input
+        alert('File is too large. Please select a file smaller than 100MB.');
+        e.target.value = '';
         return;
       }
       
-      // Show file info for transparency
-      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
-      console.log(`📁 File selected: ${file.name} (${fileSizeMB}MB)`);
-      showNotification(`File ready: ${file.name} (${fileSizeMB}MB)`, 'info');
+      // Get context from user
+      const theme = await getTodaysTheme();
+      const context = prompt(`How does "${file.name}" relate to today's theme: "${theme.title}"?`);
       
-      const context = prompt(`How does this sound relate to today's theme: "${theme.title}"?`);
-      if (context !== null) { // User didn't cancel the prompt
-        try {
-          await saveSoundDrop(file, context, 'uploaded', file.name);
-          e.target.value = ''; // Clear the input after successful upload
-        } catch (error) {
-          console.error('File upload failed:', error);
-          alert('Failed to upload file. Please try again.');
-          e.target.value = ''; // Clear the input on error
-        }
-      } else {
-        e.target.value = ''; // Clear the input if user canceled
+      if (context === null) {
+        // User canceled
+        e.target.value = '';
+        return;
       }
-    }
-  });
+      
+      try {
+        console.log('💾 ====== UPLOADING FILE ======');
+        console.log('💾 File:', file.name, 'Size:', (file.size / 1024 / 1024).toFixed(2), 'MB');
+        
+        // Save the file
+        const savedDrop = await saveSoundDrop(file, context || '', 'uploaded', file.name);
+        console.log('✅ File saved, drop ID:', savedDrop.id);
+        
+        // Clear input immediately
+        e.target.value = '';
+        
+        // CRITICAL: Get fresh data including the file we just saved
+        console.log('🔄 Fetching fresh data to display uploaded file...');
+        const freshData = await getSoundDrops();
+        console.log('📊 Got', freshData.length, 'files total');
+        
+        // Find our uploaded file in the data
+        const uploadedFile = freshData.find(d => {
+          const dId = typeof d.id === 'string' ? parseInt(d.id, 10) : d.id;
+          const savedId = typeof savedDrop.id === 'string' ? parseInt(savedDrop.id, 10) : savedDrop.id;
+          return dId === savedId || d.filename === file.name;
+        });
+        
+        if (uploadedFile) {
+          console.log('✅ Found uploaded file in data:', uploadedFile.id, uploadedFile.filename);
+        } else {
+          console.warn('⚠️ Uploaded file not found in fresh data!');
+          console.warn('Saved drop ID:', savedDrop.id);
+          console.warn('Fresh data IDs:', freshData.map(d => d.id));
+        }
+        
+        // Switch to "All Drops" tab to ensure visibility
+        const allDropsTab = document.querySelector('.filter-tag[data-filter="all"]');
+        if (allDropsTab) {
+          document.querySelectorAll('.filter-tag').forEach(b => b.classList.remove('active'));
+          allDropsTab.classList.add('active');
+          console.log('✅ Switched to "All Drops" tab');
+        }
+        
+        // Render ALL files immediately
+        console.log('🖼️ Rendering', freshData.length, 'files...');
+        renderSoundDropsFromData(freshData, 'all');
+        updateStatsFromData(freshData);
+        
+        // Wait a moment then verify the file is actually visible
+        setTimeout(() => {
+          const container = document.getElementById('sound-drops');
+          const renderedDrops = container.querySelectorAll('.sound-drop');
+          console.log('📊 Rendered', renderedDrops.length, 'drop cards');
+          
+          // Check if our file is visible
+          let fileFound = false;
+          renderedDrops.forEach((el, idx) => {
+            const playBtn = el.querySelector('.play-btn');
+            const dropType = el.querySelector('.drop-type')?.textContent;
+            const dropText = el.textContent;
+            
+            console.log(`  Card ${idx + 1}: type=${dropType}, hasPlayBtn=${!!playBtn}, text includes filename=${dropText.includes(file.name)}`);
+            
+            if (dropText.includes(file.name) || dropType === 'uploaded') {
+              fileFound = true;
+              console.log('✅ Found uploaded file in rendered cards!');
+            }
+          });
+          
+          if (fileFound) {
+            showNotification(`✅ "${file.name}" is now visible on the main page! Click the play button to listen.`, 'success');
+          } else {
+            console.error('❌ Uploaded file NOT found in rendered cards!');
+            showNotification(`✅ File uploaded! Please refresh the page to see "${file.name}".`, 'info');
+            
+            // Try one more render
+            renderSoundDropsFromData(freshData, 'all');
+          }
+        }, 1000);
+        
+      } catch (error) {
+        console.error('❌ Upload error:', error);
+        showNotification('Upload failed: ' + error.message, 'error');
+        e.target.value = '';
+      }
+    });
+    
+    console.log('✅ File upload handler set up');
+  } else {
+    console.error('❌ file-upload input not found');
+  }
   
   // Link form submission
   document.getElementById('link-form').addEventListener('submit', async (e) => {
@@ -1794,7 +1887,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   
-  // Refresh data every 30 seconds for better cross-platform sync and applaud visibility
+  // Refresh data every 30 seconds for better cross-platform sync
   setInterval(async () => {
     try {
       console.log('🔄 Auto-sync: Refreshing for cross-platform collaboration...');
@@ -2249,7 +2342,6 @@ async function saveLinkDrop(link, context) {
         type: 'link',
         filename: `link_${Date.now()}`,
         discussions: [],
-        applauds: 0
       };
       
       const backup = getLocalBackup();
@@ -2488,10 +2580,11 @@ function showNotification(message, type = 'info') {
   // Add to the top of the page
   document.body.insertBefore(notification, document.body.firstChild);
   
-  // Auto-remove after 3 seconds
+  // Auto-remove after longer delay for important messages
+  const delay = type === 'success' ? 8000 : type === 'error' ? 10000 : 5000;
   setTimeout(() => {
     if (notification && notification.parentNode) {
       notification.remove();
     }
-  }, 3000);
+  }, delay);
 }
