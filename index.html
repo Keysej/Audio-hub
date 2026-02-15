@@ -14,6 +14,20 @@
   <script src="https://kit.fontawesome.com/77e427e5fc.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.0/lame.min.js"></script>
   <link rel="stylesheet" href="style.css">
+  <script>
+    // Ensure we're using the production domain (GitHub-connected)
+    // Redirect any other Vercel domains to the production domain
+    (function() {
+      const productionDomain = 'audio-hub-ten.vercel.app';
+      const currentHost = window.location.hostname;
+      
+      // Only redirect if we're on a Vercel domain but not the production one
+      if (currentHost.includes('vercel.app') && currentHost !== productionDomain) {
+        const newUrl = window.location.protocol + '//' + productionDomain + window.location.pathname + window.location.search + window.location.hash;
+        window.location.replace(newUrl);
+      }
+    })();
+  </script>
   <script defer src="script.js"></script>
 </head>
 <body>
