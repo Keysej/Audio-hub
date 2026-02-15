@@ -16,14 +16,18 @@
   <link rel="stylesheet" href="style.css">
   <script>
     // Ensure we're using the production domain (GitHub-connected)
-    // Redirect any other Vercel domains to the production domain
+    // After re-importing in Vercel, update the domain below to match your new Vercel domain
     (function() {
-      // Use the working production domain (verified: returns HTTP 200)
-      const productionDomain = 'audio-hub-ten.vercel.app';
+      // UPDATE THIS after re-importing in Vercel to match your new production domain
+      // Check Vercel Dashboard → Settings → Domains to find your production domain
+      const productionDomain = 'audio-hub-ten.vercel.app'; // ⚠️ UPDATE THIS after re-import
+      
       const currentHost = window.location.hostname;
       
       // Only redirect if we're on a Vercel domain but not the production one
+      // This ensures all traffic goes to the correct production domain
       if (currentHost.includes('vercel.app') && currentHost !== productionDomain) {
+        console.log('Redirecting from', currentHost, 'to', productionDomain);
         const newUrl = window.location.protocol + '//' + productionDomain + window.location.pathname + window.location.search + window.location.hash;
         window.location.replace(newUrl);
       }
